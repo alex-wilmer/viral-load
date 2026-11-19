@@ -134,6 +134,38 @@ canvas { position: relative; z-index: 0; display: block; width: 100%; height: 10
 .card p { margin: 0; color: var(--dim); line-height: 1.55; font-size: 13px; }
 .card p b { color: var(--ink); font-weight: 600; }
 .picker { display: grid; gap: 8px; justify-items: center; }
+.card .tagline { margin: -4px 0 4px; color: var(--dim); font-size: 14px; max-width: 46ch; }
+.card h2.sub { font-size: clamp(26px, 5vw, 38px); }
+.summary { display: inline-flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; font: 500 12px var(--mono); color: var(--ink); background: rgba(255,255,255,0.03); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+.summary .edit { color: var(--gfp); font-weight: 700; }
+.summary:hover { border-color: var(--gfp); }
+.go.big { font-size: 17px; padding: 16px 44px; min-width: 240px; box-shadow: 0 0 32px rgba(93,255,157,0.25); }
+.buttons.secondary .go { font-size: 12px; padding: 10px 18px; }
+.card .controls { color: var(--dim); }
+.setup { display: grid; gap: 18px; width: min(640px, 100%); text-align: left; padding: 18px; border-radius: 14px; border: 1px solid var(--rule); background: rgba(5,10,13,0.88); }
+.setup section { display: grid; gap: 8px; }
+.setup .label { font: 600 11px var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
+.setup .hint { font-size: 12px; color: var(--gfp); }
+.diffs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.diff { text-align: left; display: grid; gap: 4px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--rule); background: rgba(255,255,255,0.02); color: var(--ink); cursor: pointer; font: 400 12px var(--mono); }
+.diff b { font: 700 15px var(--display); }
+.diff span { color: var(--dim); line-height: 1.4; }
+.diff:hover { border-color: var(--gfp); }
+.diff[aria-pressed="true"] { border-color: var(--gfp); background: rgba(93,255,157,0.1); box-shadow: inset 3px 0 0 var(--gfp); }
+.diff.wendy b { color: var(--amber); }
+.diff.wendy[aria-pressed="true"] { border-color: var(--amber); background: rgba(255,200,97,0.1); box-shadow: inset 3px 0 0 var(--amber); }
+.diff.antivax b { color: var(--mcherry); }
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--rule); background: transparent; color: var(--ink); font: 700 20px var(--mono); cursor: pointer; }
+.stepper button:hover { border-color: var(--gfp); color: var(--gfp); }
+.stepper output { font: 800 34px var(--display); min-width: 2.2ch; text-align: center; color: var(--gfp); }
+.setup input[type="range"] { width: 100%; accent-color: var(--gfp); }
+.setup .vax { grid-template-columns: 1fr auto; align-items: center; }
+.switch { width: 54px; height: 30px; border-radius: 999px; border: 1px solid var(--rule); background: rgba(255,255,255,0.06); position: relative; cursor: pointer; transition: background 0.2s; }
+.switch span { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--dim); transition: transform 0.2s, background 0.2s; }
+.switch[aria-checked="true"] { background: rgba(93,255,157,0.25); border-color: var(--gfp); }
+.switch[aria-checked="true"] span { transform: translateX(24px); background: var(--gfp); }
+.switch:disabled { opacity: 0.35; cursor: not-allowed; }
 .picker .label { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
 .picker .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .picker .chips button {
@@ -294,14 +326,7 @@ kbd {
       <div class="card" id="card">
         <div class="for">A clinical trial for Wendy</div>
         <h2>Viral Load</h2>
-        <div class="picker" data-picker></div>
-        <div class="buttons">
-          <button class="go" id="start" type="button">Inoculate</button>
-          <button class="go" id="vaxStart" type="button">Inoculate with mRNA vaccine</button>
-          <button class="go alt" id="overloadStart" type="button">Viral Overload</button>
-          <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
-        </div>
-        <p class="small">Keyboard: <kbd>Enter</kbd> start · <kbd>V</kbd> vaccinated · <kbd>O</kbd> overload · arrows pick. PS5: press any button first, then <b>✕</b> start · <b>□</b> vaccinated · <b>△</b> overload · d-pad picks.</p>
+        <div id="menuBody"></div>
         <details class="how">
           <summary>How to play</summary>
           <p>You are a macrophage on a glass slide. Fire <b>antibodies</b> at the virions; each hit splits a capsid into smaller particles until nothing is left. <b>Variants</b> glow red and take two hits. Catch <b>IFN</b> for a shield, <b>mAb</b> for a three-way spray, <b>mRNA</b> for homing antibodies, <b>CD4</b> for helper T cells, <b>FLG</b> for flagella (faster, tighter steering) and <b>+1</b> for an extra cell (mitosis), <b>BLCH</b> for another bleach bomb (<kbd>B</kbd> / <b>L2</b>) and <b>UV</b> for 12 seconds of UV-C laser.</p>
@@ -551,7 +576,7 @@ kbd {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], whirlpools: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, hidden: [], fatigue: 0, stiff: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], whirlpools: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, hidden: [], fatigue: 0, stiff: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1), wantVaccine: store.get('viral-load.vaccine', false),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -870,32 +895,105 @@ kbd {
     if (BOSSES[n]) return `BOSS: ${BOSSES[n].name.toLowerCase()} · ${region}`;
     return [news, crowd, region].filter(Boolean).join(' · ');
   };
-  const renderPicker = () => {
-    const el = document.querySelector('[data-picker]');
-    if (!el) return;
-    el.innerHTML = `
-      <div class="label">Difficulty</div>
-      <div class="chips wide">${DIFFICULTY_ORDER
-        .map((key) => `<button type="button" data-difficulty="${key}" aria-pressed="${key === game.difficulty}">${DIFFICULTIES[key].label}</button>`)
-        .join('')}</div>
-      <div class="hint">${diff().blurb}</div>
-      <div class="label">Start at passage</div>
-      <div class="chips">${Array.from({ length: PASSAGES }, (_, i) => i + 1)
-        .map((n) => `<button type="button" data-passage="${n}" aria-pressed="${n === game.startAt}">${n}</button>`)
-        .join('')}</div>
-      <div class="hint">${passageHint(game.startAt)}</div>`;
-    el.querySelectorAll('[data-difficulty]').forEach((btn) => {
-      btn.onclick = () => setDifficulty(btn.dataset.difficulty);
-    });
-    el.querySelectorAll('[data-passage]').forEach((btn) => {
-      btn.onclick = () => pickPassage(Number(btn.dataset.passage));
-    });
+  const ui = { view: 'menu' };
+  const summaryText = () => [
+    diff().label,
+    `Passage ${game.startAt} · ${biomeFor(game.startAt).name.toLowerCase()}`,
+    game.wantVaccine && !diff().noVaccines ? 'mRNA vaccinated' : 'Not vaccinated',
+  ].join(' · ');
+  const controlsHint = () => {
+    if (pad.index !== null) return 'Controller: <b>✕</b> begin · <b>△</b> overload · <b>□</b> vaccine · d-pad changes difficulty and passage';
+    if (window.matchMedia('(pointer: coarse)').matches) return 'Tap <b>Begin trial</b>. In play: drag the left side to steer, buttons on the right to fire.';
+    return '<kbd>Enter</kbd> begin · <kbd>O</kbd> overload · <kbd>S</kbd> setup · <kbd>V</kbd> vaccine · arrows change difficulty and passage';
   };
+  const menuHtml = () => `
+    <p class="tagline">You are a macrophage. Hold the line against ${PASSAGES} passages of viruses, bacteria and parasite bosses.</p>
+    <button type="button" class="summary" data-action="setup"><span data-summary>${summaryText()}</span><span class="edit">Change</span></button>
+    <button class="go big" id="start" type="button" data-action="start">Begin trial</button>
+    <div class="buttons secondary">
+      <button class="go alt" id="overloadStart" type="button" data-action="overload">Viral Overload</button>
+      <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
+      <button class="go dexbtn" type="button" data-action="setup">Trial setup</button>
+    </div>
+    <p class="small controls" data-controls>${controlsHint()}</p>`;
+  const setupHtml = () => {
+    const noVax = Boolean(diff().noVaccines);
+    const vaccinated = game.wantVaccine && !noVax;
+    return `
+    <div class="setup">
+      <section>
+        <div class="label">Difficulty</div>
+        <div class="diffs">${DIFFICULTY_ORDER.map((key) => `
+          <button type="button" class="diff ${key}" data-action="difficulty" data-difficulty="${key}" aria-pressed="${key === game.difficulty}">
+            <b>${DIFFICULTIES[key].label}</b><span>${DIFFICULTIES[key].blurb}</span>
+          </button>`).join('')}</div>
+      </section>
+      <section>
+        <div class="label">Starting passage</div>
+        <div class="stepper">
+          <button type="button" data-action="step" data-step="-1" aria-label="Earlier passage">−</button>
+          <output>${game.startAt}</output>
+          <button type="button" data-action="step" data-step="1" aria-label="Later passage">+</button>
+        </div>
+        <input type="range" min="1" max="${PASSAGES}" value="${game.startAt}" data-passage-range aria-label="Starting passage">
+        <div class="hint">${passageHint(game.startAt)}</div>
+      </section>
+      <section class="vax">
+        <div>
+          <div class="label">mRNA vaccine</div>
+          <div class="hint">${noVax ? 'Not available on Antivaxxer.' : 'Homing antibodies for the first 12 seconds of every passage.'}</div>
+        </div>
+        <button type="button" class="switch" role="switch" aria-checked="${vaccinated}" data-action="vaccine" ${noVax ? 'disabled' : ''} aria-label="mRNA vaccine"><span></span></button>
+      </section>
+    </div>
+    <div class="buttons">
+      <button class="go big" type="button" data-action="start">Begin trial</button>
+      <button class="go dexbtn" type="button" data-action="menu">Back</button>
+    </div>`;
+  };
+  const showMenu = () => {
+    ui.view = 'menu';
+    showCard(`<div class="for">A clinical trial for Wendy</div><h2>Viral Load</h2>${menuHtml()}${HOW_HTML}`);
+  };
+  const showSetup = () => {
+    ui.view = 'setup';
+    showCard(`<div class="for">Trial setup</div><h2 class="sub">Configure the trial</h2>${setupHtml()}`);
+  };
+  const renderPicker = () => {
+    if (ui.view === 'setup' && !overlay.hidden) {
+      const scroll = card.scrollTop;
+      card.innerHTML = `<div class="for">Trial setup</div><h2 class="sub">Configure the trial</h2>${setupHtml()}`;
+      card.scrollTop = scroll;
+      return;
+    }
+    document.querySelectorAll('[data-summary]').forEach((el) => { el.textContent = summaryText(); });
+    document.querySelectorAll('[data-controls]').forEach((el) => { el.innerHTML = controlsHint(); });
+  };
+  const toggleVaccine = () => {
+    if (diff().noVaccines) return;
+    game.wantVaccine = !game.wantVaccine;
+    store.set('viral-load.vaccine', game.wantVaccine);
+    renderPicker();
+  };
+  card.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el || el.disabled) return;
+    const act = el.dataset.action;
+    if (act === 'start') startGame();
+    if (act === 'overload') startOverload();
+    if (act === 'setup') showSetup();
+    if (act === 'menu') showMenu();
+    if (act === 'again') begin(false, game.wantVaccine);
+    if (act === 'vaccine') toggleVaccine();
+    if (act === 'difficulty') setDifficulty(el.dataset.difficulty);
+    if (act === 'step') pickPassage(game.startAt + Number(el.dataset.step));
+  });
+  card.addEventListener('input', (e) => {
+    if (e.target.matches('[data-passage-range]')) pickPassage(Number(e.target.value));
+  });
   const setDifficulty = (key) => {
     game.difficulty = key;
     store.set('viral-load.difficulty', key);
-    const vax = document.getElementById('vaxStart');
-    if (vax) vax.disabled = Boolean(DIFFICULTIES[key].noVaccines);
     renderPicker();
   };
   const pickDifficulty = (step) => {
@@ -929,9 +1027,8 @@ kbd {
     overlay.hidden = true;
     updateHud();
   };
-  const startGame = () => begin(false);
+  const startGame = () => begin(false, game.wantVaccine);
   const startOverload = () => begin(true);
-  const startVaccinated = () => begin(false, true);
 
   const overloadLimit = () => OVERLOAD.limitUnits * COPIES_PER_UNIT;
   const UNLOCKS = [
@@ -1020,7 +1117,7 @@ kbd {
     updateHud();
   };
 
-  const showCard = (html) => { card.innerHTML = html; overlay.hidden = false; card.querySelector('button')?.focus(); };
+  const showCard = (html) => { card.innerHTML = html; overlay.hidden = false; (card.querySelector('.go.big') || card.querySelector('button'))?.focus({ preventScroll: true }); };
 
   const overloadOverCard = () => {
     const bestTime = store.get('viral-load.overload-best', 0);
@@ -1040,16 +1137,18 @@ kbd {
     game.mode = 'over';
     const isBest = !game.overload && game.score > game.best;
     if (isBest) { game.best = game.score; store.set('viral-load.best', game.best); }
+    ui.view = 'over';
     const primary = game.overload
-      ? '<button class="go alt" id="againOverload" type="button">Overload again</button><button class="go" id="again" type="button">Normal game</button>'
-      : '<button class="go" id="again" type="button">Re-inoculate</button><button class="go alt" id="againOverload" type="button">Viral Overload</button>';
+      ? '<button class="go big alt" id="againOverload" type="button" data-action="overload">Overload again</button>'
+      : '<button class="go big" id="again" type="button" data-action="again">Run it back</button>';
     showCard(`
       ${game.overload ? overloadOverCard() : passageOverCard(isBest)}
-      ${game.overload ? '' : '<div class="picker" data-picker></div>'}
-      <div class="buttons">${primary}<button class="go dexbtn" type="button" data-open-dex>Pathodex</button></div>`);
-    renderPicker();
-    $('again').onclick = () => begin(false, game.vaccinated && !game.overload);
-    $('againOverload').onclick = startOverload;
+      ${game.overload ? '' : `<button type="button" class="summary" data-action="setup"><span data-summary>${summaryText()}</span><span class="edit">Change</span></button>`}
+      ${primary}
+      <div class="buttons secondary">
+        <button class="go dexbtn" type="button" data-action="menu">Main menu</button>
+        <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
+      </div>`);
     updateHud();
   };
 
@@ -4768,7 +4867,7 @@ kbd {
     padKeys.special = pressed(gp, BUTTON.square);
     const triangle = justPressed(gp, 'triangle');
     if (triangle && picking()) { startOverload(); return; }
-    if (justPressed(gp, 'square') && picking()) { startVaccinated(); return; }
+    if (justPressed(gp, 'square') && picking()) { toggleVaccine(); return; }
     if (triangle) cytokineStorm();
     const jumpNow = justPressed(gp, 'circle') || justPressed(gp, 'l1');
     padKeys.jump = jumpNow;
@@ -4833,7 +4932,8 @@ kbd {
     if (e.code === 'KeyC') { cytokineStorm(); return; }
     if (e.code === 'KeyM') { audio.on = !audio.on; store.set('viral-load.sound', audio.on); return; }
     if ((e.code === 'Enter' || e.code === 'Space') && picking()) { e.preventDefault(); startGame(); return; }
-    if (e.code === 'KeyV' && picking()) { startVaccinated(); return; }
+    if (e.code === 'KeyV' && picking()) { toggleVaccine(); return; }
+    if (e.code === 'KeyS' && picking()) { if (ui.view === 'setup') showMenu(); else showSetup(); return; }
     if (picking() && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) { e.preventDefault(); pickDifficulty(e.code === 'ArrowDown' ? 1 : -1); return; }
     if (picking() && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { e.preventDefault(); pickPassage(game.startAt + (e.code === 'ArrowRight' ? 1 : -1)); return; }
     const digit = /^Digit(\d)$/.exec(e.code);
@@ -4898,8 +4998,6 @@ kbd {
     if (touchButtons.bomb.textContent !== bombLabel) touchButtons.bomb.textContent = bombLabel;
   };
 
-  $('start').onclick = startGame;
-  $('overloadStart').onclick = startOverload;
   // ---------- Pathodex ----------
   const DEX_SECTIONS = ['Your cell', 'Viruses', 'Bacteria', 'Bosses', 'Carriers', 'Allies', 'Weapons', 'Power-ups', 'Modes', 'Glossary'];
   const at = (o) => Object.assign(o, { x: 0, y: 0 });
@@ -5223,7 +5321,7 @@ kbd {
     { section: 'Modes', name: 'Healthy Specimen', tag: 'Difficulty', art: glyphArt('H', COLORS.ink), real: 'A healthy immune system.', game: 'The standard game: 3 cells.' },
     { section: 'Modes', name: 'Immunocompromised', tag: 'Difficulty', art: glyphArt('IC', COLORS.dapi), real: 'A weakened immune system, from illness or medicines.', game: '2 cells, slower firing, weaker power-ups.' },
     { section: 'Modes', name: 'Antivaxxer', tag: 'Difficulty', art: glyphArt('A', COLORS.mcherry), real: 'Measles outbreaks follow drops in vaccination.', game: 'No vaccines at all, and measles from passage 1.' },
-    { section: 'Modes', name: 'mRNA vaccine start', tag: 'Start option', art: glyphArt('V', COLORS.amber), real: 'Vaccination before exposure means a faster response.', game: 'Homing antibodies for the first 12 seconds of every passage.' },
+    { section: 'Modes', name: 'mRNA vaccine start', tag: 'Start option', art: glyphArt('V', COLORS.amber), real: 'Vaccination before exposure means a faster response.', game: 'Turn it on in Trial setup: homing antibodies for the first 12 seconds of every passage.' },
     { section: 'Modes', name: 'Viral Overload', tag: 'Endless mode', art: glyphArt('∞', COLORS.mcherry), real: 'Viral load is how much virus is in a sample.', game: 'Never ends. Keep the viral load under the red line; score is how long you last.' },
     { section: 'Modes', name: 'Body regions', tag: 'Every 5 passages', art: glyphArt('5', COLORS.ink), real: 'Different viruses target different tissues.', game: 'The slide moves from bloodstream to lung, gut, nervous system and bone marrow.' },
   ];
@@ -5289,8 +5387,8 @@ kbd {
   document.addEventListener('click', (e) => { if (e.target.closest('[data-open-dex]')) openDex(); });
   if (/\/pathodex\/?$/.test(location.pathname) || location.hash === '#pathodex') openDex();
 
-  $('vaxStart').onclick = startVaccinated;
-  setDifficulty(game.difficulty);
+  const HOW_HTML = card.querySelector('details.how').outerHTML;
+  showMenu();
   enterBiome(biomeFor(game.startAt));
 
   // ---------- title screen: a slide already crawling with virions ----------
