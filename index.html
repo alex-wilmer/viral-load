@@ -384,6 +384,32 @@ footer.keys > span:not(.padstatus) { display: none; }
 @keyframes menu-scan { from { transform: translateY(-160px); } to { transform: translateY(100vh); } }
 @media (prefers-reduced-motion: reduce) { .card.menu .reticle, .card.menu .go.big::after, .overlay::after, .logo .tube path { animation: none; } }
 @media (max-width: 760px) { .card.menu { padding: 26px 18px 20px; } .card.menu .reticle { width: 300px; height: 300px; margin: -150px 0 0 -150px; top: 120px; } .card.menu .go.big { padding: 16px 40px; } }
+
+/* ---- difficulty ladder ---- */
+.ladder { display: grid; gap: 2px; }
+.rung { --c: color-mix(in oklab, var(--mcherry) var(--heat), var(--gfp)); display: grid; grid-template-columns: 16px auto 220px 1fr; align-items: center; gap: 14px;
+  padding: 11px 14px; border: 0; border-left: 3px solid transparent; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: 400 12px var(--mono); }
+.rung.wendy { --c: var(--amber); }
+.rung b { font: 800 19px var(--display); letter-spacing: -0.01em; color: var(--c); }
+.rung .desc { color: var(--dim); line-height: 1.4; }
+.rung .pointer { color: var(--c); opacity: 0; font-size: 12px; }
+.rung .pips { display: inline-flex; gap: 3px; }
+.rung .pips i { width: 7px; height: 16px; transform: skewX(-18deg); background: rgba(255,255,255,0.08); }
+.rung .pips i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.rung:hover, .pad-nav .card .rung:focus { background: rgba(255,255,255,0.04); }
+.rung:focus { outline: none; }
+.pad-nav .card .rung:focus { box-shadow: inset 0 0 0 2px var(--amber); outline: none; }
+.rung[aria-pressed="true"] { border-left-color: var(--c); background: linear-gradient(90deg, color-mix(in oklab, var(--c) 18%, transparent), transparent 85%); }
+.rung[aria-pressed="true"] .pointer { opacity: 1; animation: pointer-blink 0.9s steps(2, start) infinite; }
+.rung[aria-pressed="true"] b { text-shadow: 0 0 14px var(--c); }
+@keyframes pointer-blink { to { visibility: hidden; } }
+.setupcard .setup { padding: 20px 22px; }
+@media (max-width: 760px) {
+  .rung { grid-template-columns: 14px auto 1fr; gap: 10px; padding: 10px; }
+  .rung .desc { grid-column: 2 / -1; font-size: 11px; }
+  .rung b { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .rung[aria-pressed="true"] .pointer { animation: none; } }
 </style>
 
 <div class="app">
@@ -1062,9 +1088,12 @@ footer.keys > span:not(.padstatus) { display: none; }
     <div class="setup">
       <section>
         <div class="label">Difficulty</div>
-        <div class="diffs">${DIFFICULTY_ORDER.map((key) => `
-          <button type="button" class="diff ${key}" data-action="difficulty" data-difficulty="${key}" aria-pressed="${key === game.difficulty}">
-            <b>${DIFFICULTIES[key].label}</b><span>${DIFFICULTIES[key].blurb}</span>
+        <div class="ladder">${DIFFICULTY_ORDER.map((key, i) => `
+          <button type="button" class="rung ${key}" style="--heat:${(i / (DIFFICULTY_ORDER.length - 1)) * 100}%" data-action="difficulty" data-difficulty="${key}" aria-pressed="${key === game.difficulty}">
+            <span class="pointer" aria-hidden="true">▶</span>
+            <span class="pips" aria-label="Danger ${i + 1} of ${DIFFICULTY_ORDER.length}">${DIFFICULTY_ORDER.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</span>
+            <b>${DIFFICULTIES[key].label}</b>
+            <span class="desc">${DIFFICULTIES[key].blurb}</span>
           </button>`).join('')}</div>
       </section>
       <section>
@@ -1086,9 +1115,9 @@ footer.keys > span:not(.padstatus) { display: none; }
       </section>
     </div>
     <div class="buttons">
-      <button class="go big" type="button" data-action="start">Begin trial</button>
-      <button class="go dexbtn" type="button" data-action="menu">Back</button>
-    </div>`;
+      <div class="cta"><button class="go big" type="button" data-action="start">Begin trial</button></div>
+    </div>
+    <div class="buttons secondary"><button class="go dexbtn" type="button" data-action="menu">Back</button></div>`;
   };
   const showMenu = () => {
     ui.view = 'menu';
@@ -1098,6 +1127,7 @@ footer.keys > span:not(.padstatus) { display: none; }
   const showSetup = () => {
     ui.view = 'setup';
     showCard(`<div class="for">Trial setup</div><h2 class="sub">Configure the trial</h2>${setupHtml()}`);
+    card.classList.add('menu', 'setupcard');
   };
   const renderPicker = () => {
     if (ui.view === 'setup' && !overlay.hidden) {
