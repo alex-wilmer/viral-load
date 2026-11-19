@@ -228,6 +228,7 @@ canvas { position: relative; z-index: 0; display: block; width: 100%; height: 10
 .go.alt { background: transparent; color: var(--mcherry); box-shadow: inset 0 0 0 1.5px var(--mcherry); }
 .buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .card .small { font-size: 11px; }
+.pad-nav .card button:focus, .pad-nav .card input:focus, .pad-nav .card summary:focus { outline: 3px solid var(--amber); outline-offset: 4px; }
 .go:focus-visible, .pad button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 .scalebar {
   z-index: 2;
@@ -955,9 +956,9 @@ kbd {
     game.wantVaccine && !diff().noVaccines ? 'mRNA vaccinated' : 'Not vaccinated',
   ].join(' · ');
   const controlsHint = () => {
-    if (pad.index !== null) return 'Controller: <b>✕</b> begin · <b>△</b> overload · <b>□</b> vaccine · d-pad changes difficulty and passage';
+    if (pad.index !== null) return 'Controller: d-pad moves · <b>✕</b> selects · <b>○</b> back · <b>△</b> overload · <b>□</b> vaccine';
     if (window.matchMedia('(pointer: coarse)').matches) return 'Tap <b>Begin trial</b>. In play: drag the left side to steer, buttons on the right to fire.';
-    return '<kbd>Enter</kbd> begin · <kbd>O</kbd> overload · <kbd>S</kbd> setup · <kbd>V</kbd> vaccine · arrows change difficulty and passage';
+    return 'Arrows move · <kbd>Enter</kbd> selects · <kbd>O</kbd> overload · <kbd>S</kbd> setup · <kbd>V</kbd> vaccine';
   };
   const menuHtml = () => `
     <p class="tagline">You are a macrophage. Hold the line against ${PASSAGES} passages of viruses, bacteria and parasite bosses.</p>
@@ -1040,6 +1041,9 @@ kbd {
     if (act === 'vaccine') toggleVaccine();
     if (act === 'difficulty') setDifficulty(el.dataset.difficulty);
     if (act === 'step') pickPassage(game.startAt + Number(el.dataset.step));
+    if (act === 'resume') togglePause();
+    if (act === 'quit') showQuit();
+    if (act === 'quit-confirm') quitToMenu();
   });
   card.addEventListener('input', (e) => {
     if (e.target.matches('[data-passage-range]')) pickPassage(Number(e.target.value));
@@ -1205,14 +1209,67 @@ kbd {
     updateHud();
   };
 
+  const showPause = () => {
+    ui.view = 'pause';
+    showCard(`<div class="for">Slide on hold</div><h2>Paused</h2>
+      <div class="buttons"><button class="go big" id="resume" type="button" data-action="resume">Resume</button></div>
+      <div class="buttons secondary">
+        <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
+        <button class="go dexbtn" type="button" data-action="quit">Quit</button>
+      </div>`);
+  };
+  const showQuit = () => {
+    ui.view = 'quit';
+    showCard(`<div class="for">Leave the slide?</div><h2 class="sub">Quit this trial?</h2>
+      <p class="tagline">This run will end and its score won't count.</p>
+      <div class="buttons">
+        <button class="go big" type="button" data-action="resume">Keep playing</button>
+        <button class="go alt" type="button" data-action="quit-confirm">Quit to menu</button>
+      </div>`);
+  };
+  const quitToMenu = () => {
+    stopRumble();
+    Object.assign(game, {
+      mode: 'title', ship: null, shots: [], bits: [], pickups: [], phage: null, flocks: [], sputniks: [], carriers: [], whirlpools: [],
+      bombs: [], helpers: [], hidden: [], droppings: [], clouds: [], rash: [], overload: false, infected: 0, amnesia: 0, confused: 0,
+      shield: 0, spray: 0, mrna: 0, flagella: 0, superFlagella: 0, uv: 0, hp: 100, passageBanner: 0,
+    });
+    game.virions = Array.from({ length: 7 }, () => makeVirion(1 + Math.floor(Math.random() * 3), rand(0, view.w), rand(0, view.h), Math.random() < 0.25));
+    fx.hurt = 0; fx.trauma = 0; fx.slowmo = 0; fx.hitstop = 0;
+    enterBiome(biomeFor(game.startAt));
+    updateHud();
+    showMenu();
+  };
   const togglePause = () => {
-    if (game.mode === 'play') {
-      game.mode = 'paused';
-      showCard(`<div class="for">Slide on hold</div><h2>Paused</h2><div class="buttons"><button class="go" id="resume" type="button">Resume</button><button class="go dexbtn" type="button" data-open-dex>Pathodex</button></div>`);
-      $('resume').onclick = togglePause;
-      return;
-    }
+    if (game.mode === 'play') { game.mode = 'paused'; showPause(); return; }
     if (game.mode === 'paused') { game.mode = 'play'; overlay.hidden = true; }
+  };
+
+  // ---------- menu navigation (keyboard focus, d-pad, stick) ----------
+  const menuOpen = () => !overlay.hidden && dexEl.hidden;
+  const focusables = () => Array.from(card.querySelectorAll('button:not([disabled]), input[type="range"], summary')).filter((el) => el.offsetParent !== null);
+  const moveFocus = (step) => {
+    const list = focusables();
+    if (!list.length) return;
+    const at = list.indexOf(document.activeElement);
+    const next = list[at < 0 ? 0 : (at + step + list.length) % list.length];
+    next.focus({ preventScroll: false });
+    next.scrollIntoView({ block: 'nearest' });
+  };
+  const nudgeFocused = (step) => {
+    const el = document.activeElement;
+    if (el && el.matches && el.matches('[data-passage-range]')) { pickPassage(game.startAt + step); card.querySelector('[data-passage-range]')?.focus(); return true; }
+    return false;
+  };
+  const activateFocused = () => {
+    const el = document.activeElement;
+    if (el && card.contains(el) && el.click) { el.click(); return; }
+    moveFocus(0);
+  };
+  const menuBack = () => {
+    if (ui.view === 'setup') { showMenu(); return; }
+    if (ui.view === 'quit') { showPause(); return; }
+    if (ui.view === 'pause') togglePause();
   };
 
   // ---------- HUD ----------
@@ -4959,23 +5016,35 @@ kbd {
     padKeys.bomb = pressed(gp, BUTTON.l2);
     padKeys.fire = pressed(gp, BUTTON.cross) || pressed(gp, BUTTON.r1);
     padKeys.special = pressed(gp, BUTTON.square);
-    const triangle = justPressed(gp, 'triangle');
-    if (triangle && picking()) { startOverload(); return; }
-    if (justPressed(gp, 'square') && picking()) { toggleVaccine(); return; }
-    if (triangle) cytokineStorm();
-    const jumpNow = justPressed(gp, 'circle') || justPressed(gp, 'l1');
-    padKeys.jump = jumpNow;
-    const options = justPressed(gp, 'options');
-    const cross = justPressed(gp, 'cross');
-    if (options && (game.mode === 'play' || game.mode === 'paused')) { togglePause(); return; }
-    const dLeft = justPressed(gp, 'left');
-    const dRight = justPressed(gp, 'right');
-    if (picking() && (dLeft || dRight)) pickPassage(game.startAt + (dRight ? 1 : -1));
-    const dUp = justPressed(gp, 'up');
-    const dDown = justPressed(gp, 'down');
-    if (picking() && (dUp || dDown)) pickDifficulty(dDown ? 1 : -1);
-    if ((options || cross) && picking()) { startGame(); return; }
-    if (cross && game.mode === 'paused') togglePause();
+    const press = Object.fromEntries(['triangle', 'square', 'circle', 'l1', 'options', 'cross', 'left', 'right', 'up', 'down'].map((name) => [name, justPressed(gp, name)]));
+    const sx = gp.axes[0] || 0, sy = gp.axes[1] || 0;
+    const stickDir = Math.abs(sx) > 0.6 || Math.abs(sy) > 0.6 ? (Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'right' : 'left') : (sy > 0 ? 'down' : 'up')) : null;
+    const stickTap = stickDir && stickDir !== pad.stickWas ? stickDir : null;
+    pad.stickWas = stickDir;
+    if (!dexEl.hidden) {
+      if (press.circle || press.options) closeDex();
+      if (press.down || stickTap === 'down') dexEl.scrollBy({ top: 240, behavior: 'smooth' });
+      if (press.up || stickTap === 'up') dexEl.scrollBy({ top: -240, behavior: 'smooth' });
+      padKeys.fire = false;
+      return;
+    }
+    if (menuOpen()) {
+      document.body.classList.add('pad-nav');
+      padKeys.fire = false; padKeys.special = false; padKeys.bomb = false;
+      const back = press.left || stickTap === 'left' || press.up || stickTap === 'up';
+      const ahead = press.right || stickTap === 'right' || press.down || stickTap === 'down';
+      if (back && !((press.left || stickTap === 'left') && nudgeFocused(-1))) moveFocus(-1);
+      if (ahead && !((press.right || stickTap === 'right') && nudgeFocused(1))) moveFocus(1);
+      if (press.cross) activateFocused();
+      if (press.circle) menuBack();
+      if (press.options && game.mode === 'paused') togglePause();
+      if (press.triangle && picking() && ui.view === 'menu') startOverload();
+      if (press.square && picking()) toggleVaccine();
+      return;
+    }
+    if (press.triangle) cytokineStorm();
+    padKeys.jump = press.circle || press.l1;
+    if (press.options && (game.mode === 'play' || game.mode === 'paused')) togglePause();
   };
   const padName = (gp) => (/dualsense|054c|ps5/i.test(gp.id) ? 'DualSense' : 'Controller');
   window.addEventListener('gamepadconnected', (e) => {
@@ -5025,11 +5094,16 @@ kbd {
     if (e.code === 'KeyO' && picking()) { startOverload(); return; }
     if (e.code === 'KeyC') { cytokineStorm(); return; }
     if (e.code === 'KeyM') { audio.on = !audio.on; store.set('viral-load.sound', audio.on); return; }
-    if ((e.code === 'Enter' || e.code === 'Space') && picking()) { e.preventDefault(); startGame(); return; }
+    if ((e.code === 'Enter' || e.code === 'Space') && menuOpen()) { const el = document.activeElement; if (el && card.contains(el) && el.matches('button, summary')) return; e.preventDefault(); if (picking()) startGame(); return; }
     if (e.code === 'KeyV' && picking()) { toggleVaccine(); return; }
     if (e.code === 'KeyS' && picking()) { if (ui.view === 'setup') showMenu(); else showSetup(); return; }
-    if (picking() && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) { e.preventDefault(); pickDifficulty(e.code === 'ArrowDown' ? 1 : -1); return; }
-    if (picking() && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { e.preventDefault(); pickPassage(game.startAt + (e.code === 'ArrowRight' ? 1 : -1)); return; }
+    if (menuOpen() && /^Arrow/.test(e.code)) {
+      if (document.activeElement?.matches?.('[data-passage-range]') && /Left|Right/.test(e.code)) return;
+      e.preventDefault(); document.body.classList.add('pad-nav');
+      moveFocus(/Up|Left/.test(e.code) ? -1 : 1);
+      return;
+    }
+    if (menuOpen() && e.code === 'Backspace') { menuBack(); return; }
     const digit = /^Digit(\d)$/.exec(e.code);
     if (picking() && digit) { pickPassage(digit[1] === '0' ? 10 : Number(digit[1])); return; }
     const k = KEYMAP[e.code]; if (!k) return;
@@ -5477,8 +5551,12 @@ kbd {
     dexThumbs.filter((t) => t.visible).forEach(renderThumb);
   };
   $('dexClose').onclick = closeDex;
-  window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && !dexEl.hidden) { e.stopImmediatePropagation(); closeDex(); } }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && !dexEl.hidden) { e.stopImmediatePropagation(); closeDex(); return; }
+    if (e.code === 'Escape' && menuOpen() && (ui.view === 'setup' || ui.view === 'quit')) { e.stopImmediatePropagation(); menuBack(); }
+  }, true);
   document.addEventListener('click', (e) => { if (e.target.closest('[data-open-dex]')) openDex(); });
+  document.addEventListener('pointerdown', () => document.body.classList.remove('pad-nav'));
   if (/\/pathodex\/?$/.test(location.pathname) || location.hash === '#pathodex') openDex();
 
   const HOW_HTML = card.querySelector('details.how').outerHTML;
