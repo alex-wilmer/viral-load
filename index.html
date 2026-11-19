@@ -231,8 +231,8 @@ kbd {
         <p class="small">Keyboard: <kbd>Enter</kbd> start · <kbd>V</kbd> vaccinated · <kbd>O</kbd> overload · arrows pick. PS5: press any button first, then <b>✕</b> start · <b>□</b> vaccinated · <b>△</b> overload · d-pad picks.</p>
         <details class="how">
           <summary>How to play</summary>
-          <p>You are a macrophage on a glass slide. Fire <b>antibodies</b> at the virions; each hit splits a capsid into smaller particles until nothing is left. <b>Variants</b> glow red and take two hits. Catch <b>IFN</b> for a shield, <b>mAb</b> for a three-way spray, <b>mRNA</b> for homing antibodies, <b>CD4</b> for helper T cells, <b>FLG</b> for flagella (faster, tighter steering) and <b>+1</b> for an extra cell (mitosis).</p>
-          <p>New viruses arrive every passage, and so do new weapons: the <b>complement cascade</b> (passage 3), the <b>perforin lance</b> on <kbd>X</kbd> / <b>□</b> (5), <b>phage therapy</b> drones (8) and the <b>neutrophil NET</b> (11).</p>
+          <p>You are a macrophage on a glass slide. Fire <b>antibodies</b> at the virions; each hit splits a capsid into smaller particles until nothing is left. <b>Variants</b> glow red and take two hits. Catch <b>IFN</b> for a shield, <b>mAb</b> for a three-way spray, <b>mRNA</b> for homing antibodies, <b>CD4</b> for helper T cells, <b>FLG</b> for flagella (faster, tighter steering) and <b>+1</b> for an extra cell (mitosis), <b>BLCH</b> for another bleach bomb (<kbd>B</kbd> / <b>L2</b>) and <b>UV</b> for 12 seconds of UV-C laser.</p>
+          <p>New viruses arrive every passage, and so do new weapons: the <b>complement cascade</b> (passage 3), the <b>perforin lance</b> on <kbd>X</kbd> / <b>□</b> (5), <b>phage therapy</b> drones (8) and the <b>neutrophil NET</b> (11) and the <b>UV-C laser</b> (14).</p>
           <p>The <b>mRNA vaccine</b> start gives you homing antibodies for the first 12 seconds of every passage. <b>Viral Overload</b> never ends: keep the viral load under the red line, and spend a cell on a <b>cytokine storm</b> (<kbd>C</kbd> / <b>△</b>) when it gets bad.</p>
         </details>
       </div>
@@ -245,10 +245,11 @@ kbd {
     <span><kbd>Space</kbd> antibodies</span>
     <span><kbd>H</kbd> endocytose (jump)</span>
     <span><kbd>X</kbd> perforin lance (passage 5+)</span>
+    <span><kbd>B</kbd> bleach bomb</span>
     <span><kbd>C</kbd> cytokine storm (Overload)</span>
     <span><kbd>P</kbd> pause</span>
     <span><kbd>M</kbd> sound</span>
-    <span>PS5: stick or d-pad rotate · <kbd>R2</kbd> crawl · <kbd>✕</kbd>/<kbd>R1</kbd> fire · <kbd>□</kbd> lance · <kbd>○</kbd> jump · <kbd>Options</kbd> pause</span>
+    <span>PS5: stick or d-pad rotate · <kbd>R2</kbd> crawl · <kbd>✕</kbd>/<kbd>R1</kbd> fire · <kbd>□</kbd> lance · <kbd>L2</kbd> bleach · <kbd>○</kbd> jump · <kbd>Options</kbd> pause</span>
     <span id="padStatus" class="padstatus" hidden>Controller connected</span>
   </footer>
   <div class="pad" id="pad">
@@ -294,6 +295,7 @@ kbd {
     { at: 5, key: 'perforin', name: 'Perforin lance', how: 'X / □ fires a piercing T-cell beam' },
     { at: 8, key: 'drones', name: 'Phage therapy', how: 'Two friendly phages orbit you and fire on their own' },
     { at: 11, key: 'net', name: 'Neutrophil NET', how: 'The lance now also throws a web that shreds everything near you' },
+    { at: 14, key: 'uv', name: 'UV-C laser', how: 'Hold fire for a germicidal laser that pierces everything' },
   ];
   const PERFORIN = { cooldown: 2.4, length: 460, width: 9, damage: 2 };
   const NET = { radius: 130, push: 220 };
@@ -319,6 +321,8 @@ kbd {
   const HELPER_T = { count: 3, seconds: 16, every: 0.8, range: 260, fireBoost: 0.75 };
   const VIRUS_CAP = 22;
   const FLAGELLA = { seconds: 15, turn: 5.4, thrust: 420, drag: 0.12, maxSpeed: 400 };
+  const BLEACH = { start: 2, max: 3, speed: 330, fuse: 0.55, radius: 150, damage: 3, cooldown: 0.6, color: '#f4ffd6' };
+  const UV = { length: 420, width: 6, tick: 0.13, pickupSeconds: 12, color: '#b98cff' };
   const MITOSIS = { maxCells: 7, everyPassages: 4 };
   const HEP = {
     hepa: { letter: 'A', color: '#ffb86b', r: 8, hp: 1, score: 60, load: 1, speed: [55, 75], shape: 'hex' },
@@ -405,14 +409,14 @@ kbd {
   };
 
   // ---------- state ----------
-  const keys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false };
-  const padKeys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false };
+  const keys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false, bomb: false };
+  const padKeys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false, bomb: false };
   const held = (k) => keys[k] || padKeys[k];
   const game = {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], flagella: 0, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], flagella: 0, bleach: 0, bombs: [], bombCd: 0, uv: 0, uvOn: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -712,7 +716,7 @@ kbd {
     const vaccinated = wantVaccine && !diff().noVaccines;
     Object.assign(game, {
       mode: 'play', score: 0, lives: diff().lives, passage: overload ? 1 : game.startAt, specialCd: 0, droneT: 0, announced: 1, shots: [], bits: [], pickups: [], phage: null,
-      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [], flagella: 0,
+      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [], flagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, uv: 0, uvOn: false,
       overload, vaccinated, mrna: 0, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
     });
     game.ship = newShip();
@@ -881,7 +885,7 @@ kbd {
   // ---------- actions ----------
   // ---------- juice: shake, hit-stop, rings, flashes, pops ----------
   const motion = reduceMotion ? 0.25 : 1;
-  const fx = { beams: [], nets: [], slowmo: 0, chain: 0, chainT: 0, shards: [], trauma: 0, kickX: 0, kickY: 0, recoil: 0, muzzle: 0, hitstop: 0, hurt: 0, rings: [], flashes: [], pops: [], dust: [] };
+  const fx = { bleachSplats: [], beams: [], nets: [], slowmo: 0, chain: 0, chainT: 0, shards: [], trauma: 0, kickX: 0, kickY: 0, recoil: 0, muzzle: 0, hitstop: 0, hurt: 0, rings: [], flashes: [], pops: [], dust: [] };
   const shake = (amount) => { fx.trauma = Math.min(1, fx.trauma + amount * motion); };
   const kick = (angle, px) => { fx.kickX += Math.cos(angle) * px * motion; fx.kickY += Math.sin(angle) * px * motion; };
   const freeze = (seconds) => { fx.hitstop = Math.max(fx.hitstop, seconds * motion); };
@@ -954,6 +958,7 @@ kbd {
     const age = (list) => list.filter((e) => { e.life -= dt; return e.life > 0; });
     fx.rings = age(fx.rings);
     fx.beams = age(fx.beams);
+    fx.bleachSplats = age(fx.bleachSplats);
     fx.nets = age(fx.nets);
     fx.flashes = age(fx.flashes);
     fx.pops = age(fx.pops);
@@ -1018,7 +1023,7 @@ kbd {
   const dropPickup = (x, y) => {
     if (Math.random() > diff().drop) return;
     const roll = Math.random();
-    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.84 ? 'FLG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : diff().noVaccines ? 'CD4' : 'mRNA';
+    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.84 ? 'FLG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : roll < 0.95 && game.bleach < BLEACH.max ? 'BLCH' : roll < 0.975 ? 'UV' : diff().noVaccines ? 'CD4' : 'mRNA';
     game.pickups.push({ x, y, kind, life: 9, r: 11, vx: rand(-20, 20), vy: rand(-20, 20) });
   };
 
@@ -1496,6 +1501,75 @@ kbd {
     return true;
   };
 
+  const uvArmed = () => game.uv > 0 || hasWeapon('uv');
+  const uvBeam = (s) => {
+    const from = { x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16 };
+    return { from, to: { x: from.x + Math.cos(s.a) * UV.length, y: from.y + Math.sin(s.a) * UV.length } };
+  };
+  const uvLaser = (dt) => {
+    const s = game.ship;
+    const { from, to } = uvBeam(s);
+    const inBeam = (o, r) => distToSegment(o, from, to) < r + UV.width;
+    game.virions.filter((v) => solid(v) && inBeam(v, v.r)).forEach((v) => {
+      v.uvCd = (v.uvCd ?? 0) - dt;
+      if (v.uvCd > 0) return;
+      v.uvCd = UV.tick;
+      damage(v, v.x, v.y, 1);
+      flashAt(v.x, v.y, v.r * 0.9, UV.color, 0.08);
+    });
+    game.carriers.filter((c) => !c.fleeing && inBeam(c, c.r)).forEach((c) => {
+      c.uvCd = (c.uvCd ?? 0) - dt;
+      if (c.uvCd > 0) return;
+      c.uvCd = UV.tick * 2;
+      hitCarrier(c, c);
+    });
+    if (game.phage && inBeam(game.phage, game.phage.r)) {
+      game.phage.uvCd = (game.phage.uvCd ?? 0) - dt;
+      if (game.phage.uvCd <= 0) { game.phage.uvCd = UV.tick * 2; hurtPhage(game.phage.x, game.phage.y, 1); }
+    }
+    fx.trauma = Math.max(fx.trauma, 0.12 * motion);
+    fx.recoil = Math.max(fx.recoil, 1.5);
+    if (Math.random() < 0.5) game.bits.push({ x: from.x, y: from.y, vx: Math.cos(s.a + rand(-0.8, 0.8)) * 120, vy: Math.sin(s.a + rand(-0.8, 0.8)) * 120, life: 0.15, max: 0.15, color: UV.color, size: 1.4 });
+  };
+  const throwBleach = () => {
+    const s = game.ship;
+    game.bleach -= 1;
+    game.bombCd = BLEACH.cooldown;
+    game.bombs.push({ x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16, vx: Math.cos(s.a) * BLEACH.speed + s.vx, vy: Math.sin(s.a) * BLEACH.speed + s.vy, fuse: BLEACH.fuse, spin: 0 });
+    kick(s.a + Math.PI, 3);
+    sfx.jump();
+  };
+  const detonate = (b) => {
+    b.done = true;
+    game.virions.filter((v) => solid(v) && hits(b, BLEACH.radius, v, v.r * 0.5)).forEach((v) => damage(v, v.x, v.y, BLEACH.damage));
+    if (game.phage && hits(b, BLEACH.radius, game.phage, 0)) hurtPhage(game.phage.x, game.phage.y, BLEACH.damage);
+    game.carriers.filter((c) => !c.fleeing && hits(b, BLEACH.radius, c, 0)).forEach((c) => { c.hp = 1; hitCarrier(c, b); });
+    game.clouds = game.clouds.filter((c) => !hits(b, BLEACH.radius, c, 0));
+    game.rash = game.rash.filter((d) => !hits(b, BLEACH.radius, d, 0));
+    ring(b.x, b.y, BLEACH.radius, BLEACH.color, 0.55, 6);
+    ring(b.x, b.y, BLEACH.radius * 0.6, '#ffffff', 0.35, 3);
+    flashAt(b.x, b.y, BLEACH.radius * 0.9, BLEACH.color, 0.18);
+    Array.from({ length: 40 }).forEach(() => {
+      const a = rand(0, Math.PI * 2); const sp = rand(60, 320);
+      game.bits.push({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.9), max: 0.9, color: Math.random() < 0.5 ? BLEACH.color : '#ffffff', size: rand(1.5, 3) });
+    });
+    fx.bleachSplats.push({ x: b.x, y: b.y, life: 1.4, max: 1.4, seed: rand(0, 10) });
+    shake(0.7); freeze(0.08);
+    sfx.pop(3); sfx.die();
+    rumble(0.9, 350);
+  };
+  const stepBombs = (dt) => {
+    game.bombs.forEach((b) => {
+      b.fuse -= dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.vx *= Math.exp(-dt * 2.2); b.vy *= Math.exp(-dt * 2.2);
+      b.spin += dt * 14;
+      wrap(b);
+      const touching = game.virions.some((v) => solid(v) && touches(v, b, 6));
+      if (b.fuse <= 0 || touching) detonate(b);
+    });
+    game.bombs = game.bombs.filter((b) => !b.done);
+  };
   const mitosis = () => {
     const s = game.ship;
     game.lives = Math.min(MITOSIS.maxCells, game.lives + 1);
@@ -1801,8 +1875,12 @@ kbd {
       if (speed > top) { s.vx *= top / speed; s.vy *= top / speed; }
       s.x += s.vx * dt; s.y += s.vy * dt; wrap(s);
       s.safe = Math.max(0, s.safe - dt);
-      if (held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
+      game.uvOn = uvArmed() && held('fire') && game.amnesia <= 0;
+      if (game.uvOn) uvLaser(dt);
+      if (!game.uvOn && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
       game.specialCd = Math.max(0, game.specialCd - dt);
+      game.bombCd = Math.max(0, game.bombCd - dt);
+      if (held('bomb') && game.bombCd <= 0 && game.bleach > 0) throwBleach();
       if (held('special') && game.specialCd <= 0 && game.amnesia <= 0 && hasWeapon('perforin')) special();
       if (held('jump') && game.jumpCooldown <= 0) { jump(); game.jumpCooldown = 1.5; keys.jump = false; }
     }
@@ -1812,6 +1890,8 @@ kbd {
     game.shots = game.shots.filter((b) => { const st = b.from === 'phage' ? edt : dt; b.x += b.vx * st; b.y += b.vy * st; b.life -= st; wrap(b); return b.life > 0; });
     stepDrones(dt);
     stepHelpers(dt);
+    stepBombs(dt);
+    game.uv = Math.max(0, game.uv - dt);
     game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
     game.confused = Math.max(0, game.confused - dt);
@@ -1873,9 +1953,11 @@ kbd {
         if (p.kind === 'CD4') callHelpers();
         if (p.kind === 'FLG') game.flagella = FLAGELLA.seconds * diff().boost;
         if (p.kind === 'CELL') mitosis();
+        if (p.kind === 'UV') game.uv = UV.pickupSeconds * diff().boost;
+        if (p.kind === 'BLCH') game.bleach = Math.min(BLEACH.max, game.bleach + 1);
         sfx.pickup(); burst(p.x, p.y, COLORS.amber, 12, 90);
         ring(p.x, p.y, 60, COLORS.amber, 0.45, 3); shake(0.12);
-        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: 'FLAGELLA: TIGHT STEERING', CELL: 'MITOSIS: +1 CELL', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
+        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: 'FLAGELLA: TIGHT STEERING', CELL: 'MITOSIS: +1 CELL', BLCH: '+1 BLEACH BOMB', UV: 'UV-C LASER', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
         return false;
       }
       return p.life > 0;
@@ -1898,7 +1980,7 @@ kbd {
 
     announceWeapon();
     if (game.overload) stepOverload(dt);
-    else if (game.virions.length === 0 && game.lives > 0) { slideClear(); game.passage += 1; startPassage(); if (game.passage % MITOSIS.everyPassages === 0) dropMitosis(); }
+    else if (game.virions.length === 0 && game.lives > 0) { slideClear(); game.bleach = Math.min(BLEACH.max, game.bleach + 1); game.passage += 1; startPassage(); if (game.passage % MITOSIS.everyPassages === 0) dropMitosis(); }
     updateHud();
   };
 
@@ -3046,6 +3128,8 @@ kbd {
       game.mmrT > 0 && !diff().noVaccines && game.virions.some((v) => MMR_KINDS.includes(v.kind)) ? `MMR VACCINE IN ${game.mmrT.toFixed(0)}s` : null,
       game.rashSlow > 0 ? 'RUBELLA RASH: SLOWED' : null,
       game.confused > 0 ? `NIPAH ENCEPHALITIS: CONTROLS SWAPPED ${game.confused.toFixed(0)}s` : null,
+      game.mode === 'play' && game.uv > 0 ? `UV-C LASER ${game.uv.toFixed(0)}s · HOLD FIRE` : null,
+      game.mode === 'play' ? `BLEACH ×${game.bleach} · B / L2` : null,
       game.flagella > 0 ? `FLAGELLA ${game.flagella.toFixed(0)}s` : null,
       game.helpers.length ? `HELPER T CELLS ${Math.max(...game.helpers.map((h) => h.life)).toFixed(0)}s` : null,
     ].filter(Boolean);
@@ -3164,6 +3248,50 @@ kbd {
       ctx.translate(d.x, d.y);
       ctx.scale(0.45, 0.45);
       ctx.drawImage(t4Body(false).c, -48, -48, 96, 96);
+      ctx.restore();
+    });
+  };
+  const drawUV = () => {
+    const s = game.ship;
+    if (!s || !game.uvOn || game.mode !== 'play') return;
+    const { from, to } = uvBeam(s);
+    const flicker = 0.85 + 0.15 * Math.sin(game.t * 90);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    [[UV.width * 3.2, '#6a3cff', 0.25], [UV.width * 1.6, UV.color, 0.6], [UV.width * 0.5, '#ffffff', 0.95]].forEach(([width, color, alpha]) => {
+      ctx.globalAlpha = alpha * flicker;
+      ctx.strokeStyle = color; ctx.lineWidth = width * flicker;
+      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+    });
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(glowSprite(UV.color).c, from.x - 14, from.y - 14, 28, 28);
+    ctx.restore();
+  };
+  const drawBleach = () => {
+    fx.bleachSplats.forEach((f) => {
+      const t = f.life / f.max;
+      ctx.save();
+      ctx.globalAlpha = t * 0.35;
+      ctx.fillStyle = BLEACH.color;
+      ctx.beginPath();
+      Array.from({ length: 25 }).forEach((_, i) => {
+        const a = (i / 24) * Math.PI * 2;
+        const r = BLEACH.radius * (0.75 + 0.2 * Math.sin(a * 5 + f.seed) + 0.1 * Math.sin(a * 11 + f.seed * 2)) * (1 - t * 0.3);
+        i ? ctx.lineTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r) : ctx.moveTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r);
+      });
+      ctx.fill();
+      ctx.restore();
+    });
+    game.bombs.forEach((b) => {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.spin);
+      ctx.drawImage(glowSprite(BLEACH.color).c, -18, -18, 36, 36);
+      ctx.beginPath();
+      ctx.moveTo(0, -7); ctx.bezierCurveTo(6, -1, 6, 6, 0, 7); ctx.bezierCurveTo(-6, 6, -6, -1, 0, -7);
+      ctx.fillStyle = BLEACH.color; ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
       ctx.restore();
     });
   };
@@ -3299,6 +3427,8 @@ kbd {
     drawHelpers();
     drawMuzzle();
     drawWeapons();
+    drawBleach();
+    drawUV();
     drawBursts();
     drawPops();
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
@@ -3339,7 +3469,8 @@ kbd {
     const x = gp.axes[0] || 0;
     padKeys.left = x < -STICK_DEAD || pressed(gp, BUTTON.left);
     padKeys.right = x > STICK_DEAD || pressed(gp, BUTTON.right);
-    padKeys.thrust = pressed(gp, BUTTON.r2) || pressed(gp, BUTTON.l2) || pressed(gp, BUTTON.up) || (gp.axes[1] || 0) < -0.6;
+    padKeys.thrust = pressed(gp, BUTTON.r2) || pressed(gp, BUTTON.up) || (gp.axes[1] || 0) < -0.6;
+    padKeys.bomb = pressed(gp, BUTTON.l2);
     padKeys.fire = pressed(gp, BUTTON.cross) || pressed(gp, BUTTON.r1);
     padKeys.special = pressed(gp, BUTTON.square);
     const triangle = justPressed(gp, 'triangle');
@@ -3400,7 +3531,7 @@ kbd {
   };
 
   // ---------- input ----------
-  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'thrust', KeyW: 'thrust', Space: 'fire', KeyX: 'special', KeyH: 'jump', ShiftLeft: 'jump' };
+  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'thrust', KeyW: 'thrust', Space: 'fire', KeyX: 'special', KeyB: 'bomb', KeyH: 'jump', ShiftLeft: 'jump' };
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
     if (e.code === 'KeyO' && picking()) { startOverload(); return; }

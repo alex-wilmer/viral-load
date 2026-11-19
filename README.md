@@ -6,8 +6,8 @@ The whole game is one file, `index.html`: plain canvas and Web Audio, no build s
 
 ## Controls
 
-- Keyboard: arrows rotate and crawl, Space fires, X perforin lance, H jump, C cytokine storm (Viral Overload), P pause, M sound.
-- PS5 / standard gamepad: stick or d-pad rotate, R2 crawl, ✕ / R1 fire, □ lance, ○ jump, △ storm, Options pause.
+- Keyboard: arrows rotate and crawl, Space fires, X perforin lance, B bleach bomb, H jump, C cytokine storm (Viral Overload), P pause, M sound.
+- PS5 / standard gamepad: stick or d-pad rotate, R2 crawl, ✕ / R1 fire, □ lance, L2 bleach bomb, ○ jump, △ storm, Options pause.
 
 ## Deploy
 
