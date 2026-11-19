@@ -82,6 +82,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 3;
   display: grid;
   place-items: safe center;
   overflow-y: auto;
@@ -180,25 +181,40 @@ kbd {
   padding: 1px 5px;
 }
 .padstatus { color: var(--gfp); }
-.pad {
-  display: none;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-.pad button {
-  font: 600 12px var(--mono);
-  color: var(--ink);
-  background: #0c1a17;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  padding: 16px 0;
+.touch { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.touch .stickzone { position: absolute; left: 0; bottom: 0; width: 50%; height: 70%; pointer-events: auto; touch-action: none; }
+.touch .stickbase, .touch .stickknob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
+.touch .stickbase { width: 116px; height: 116px; border: 2px solid rgba(93,255,157,0.35); background: rgba(93,255,157,0.06); }
+.touch .stickknob { width: 52px; height: 52px; background: rgba(93,255,157,0.35); border: 2px solid rgba(93,255,157,0.8); }
+.touch .stickhint { position: absolute; left: 18px; bottom: 18px; font: 600 10px var(--mono); color: rgba(217,243,234,0.45); letter-spacing: 0.1em; pointer-events: none; }
+.touch .tb {
+  position: absolute;
+  pointer-events: auto;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  border-radius: 50%;
+  font: 700 11px var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgba(12,26,23,0.55);
+  border: 2px solid rgba(217,243,234,0.35);
+  display: grid;
+  place-items: center;
 }
-.pad button.fire { background: #12301f; color: var(--gfp); }
+.touch .tb.on, .touch .tb:active { background: rgba(93,255,157,0.3); }
+.touch .tb.off { opacity: 0.3; }
+.touch .t-fire { right: 18px; bottom: 24px; width: 84px; height: 84px; font-size: 13px; color: var(--gfp); border-color: rgba(93,255,157,0.8); background: rgba(18,48,31,0.6); }
+.touch .t-lance { right: 112px; bottom: 30px; width: 58px; height: 58px; color: var(--mcherry); border-color: rgba(255,93,122,0.6); }
+.touch .t-bomb { right: 96px; bottom: 100px; width: 58px; height: 58px; color: #f4ffd6; border-color: rgba(244,255,214,0.6); }
+.touch .t-jump { right: 26px; bottom: 122px; width: 58px; height: 58px; }
+.touch .t-storm { right: 166px; bottom: 96px; width: 58px; height: 58px; color: var(--mcherry); border-color: rgba(255,93,122,0.8); }
+.touch .t-pause { right: 12px; top: 12px; width: 40px; height: 40px; border-radius: 10px; font-size: 13px; }
+@media (pointer: coarse), (max-width: 760px) {
+  .touch { display: block; }
+}
+.touch.idle { display: none !important; }
 @media (pointer: coarse) {
-  .pad { display: grid; }
   footer.keys { display: none; }
 }
 #score { display: inline-block; transform-origin: left center; }
@@ -218,6 +234,18 @@ kbd {
 
   <div class="stage" id="stage">
     <canvas id="field" aria-label="The microscope field. Virions drift and split when your antibodies hit them."></canvas>
+    <div class="touch" id="touch" aria-hidden="true">
+      <div class="stickzone" id="stickzone"></div>
+      <div class="stickhint" id="stickhint">DRAG TO STEER</div>
+      <div class="stickbase" id="stickbase" hidden></div>
+      <div class="stickknob" id="stickknob" hidden></div>
+      <button type="button" class="tb t-fire" data-key="fire">FIRE</button>
+      <button type="button" class="tb t-lance" data-key="special">LANCE</button>
+      <button type="button" class="tb t-bomb" data-key="bomb">BLEACH</button>
+      <button type="button" class="tb t-jump" data-key="jump">JUMP</button>
+      <button type="button" class="tb t-storm" data-storm hidden>STORM</button>
+      <button type="button" class="tb t-pause" data-pause>❚❚</button>
+    </div>
     <div class="mag">DARK FIELD · 100× OIL · <span id="strain">STRAIN WT</span></div>
     <div class="scalebar"><i></i>10 µm</div>
     <div class="overlay" id="overlay">
@@ -254,13 +282,6 @@ kbd {
     <span>PS5: stick or d-pad rotate · <kbd>R2</kbd> crawl · <kbd>✕</kbd>/<kbd>R1</kbd> fire · <kbd>□</kbd> lance · <kbd>L2</kbd> bleach · <kbd>○</kbd> jump · <kbd>Options</kbd> pause</span>
     <span id="padStatus" class="padstatus" hidden>Controller connected</span>
   </footer>
-  <div class="pad" id="pad">
-    <button type="button" data-key="left">◀</button>
-    <button type="button" data-key="right">▶</button>
-    <button type="button" data-key="thrust">▲</button>
-    <button type="button" data-key="jump">JUMP</button>
-    <button type="button" class="fire" data-key="fire">FIRE</button>
-  </div>
 </div>
 
 <script>
@@ -362,13 +383,15 @@ kbd {
     set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
   };
 
-  const view = { w: 800, h: 500, dpr: 1 };
+  const view = { w: 800, h: 500, dpr: 1, zoom: 1 };
   const quality = { low: false, ema: 16.7, slowFor: 0 };
   const fit = () => {
     const box = stageEl.getBoundingClientRect();
-    view.dpr = quality.low ? 1 : Math.min(1.5, window.devicePixelRatio || 1);
-    view.w = Math.max(280, box.width);
-    view.h = Math.max(240, box.height);
+    const screenDpr = quality.low ? 1 : Math.min(1.5, window.devicePixelRatio || 1);
+    view.zoom = Math.max(0.55, Math.min(1, box.width / 760, box.height / 480));
+    view.dpr = screenDpr * view.zoom;
+    view.w = Math.max(280, box.width / view.zoom);
+    view.h = Math.max(240, box.height / view.zoom);
     canvas.width = Math.round(view.w * view.dpr);
     canvas.height = Math.round(view.h * view.dpr);
     if (typeof seedDust === 'function') seedDust();
@@ -428,6 +451,7 @@ kbd {
   // ---------- state ----------
   const keys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false, bomb: false };
   const padKeys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false, bomb: false };
+  const touchStick = { id: null, ox: 0, oy: 0, angle: 0, mag: 0 };
   const held = (k) => keys[k] || padKeys[k];
   const game = {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
@@ -2035,7 +2059,14 @@ kbd {
       const swap = game.confused > 0;
       if (held(swap ? 'right' : 'left')) s.a -= turn * dt;
       if (held(swap ? 'left' : 'right')) s.a += turn * dt;
-      if (held('thrust')) {
+      const steering = touchStick.id !== null && touchStick.mag > STICK.deadzone;
+      if (steering) {
+        const want = swap ? touchStick.angle + Math.PI : touchStick.angle;
+        const step = turn * 1.5 * dt;
+        s.a += Math.max(-step, Math.min(step, angleTo(s.a, want)));
+      }
+      const stickThrust = steering && touchStick.mag > STICK.thrustFrom;
+      if (held('thrust') || stickThrust) {
         const push = tail ? tail.thrust : 260;
         s.vx += Math.cos(s.a) * push * sluggish * dt; s.vy += Math.sin(s.a) * push * sluggish * dt;
         if (Math.random() < 0.6) game.bits.push({ x: s.x - Math.cos(s.a) * 12, y: s.y - Math.sin(s.a) * 12, vx: -Math.cos(s.a + rand(-0.4, 0.4)) * 90, vy: -Math.sin(s.a + rand(-0.4, 0.4)) * 90, life: 0.35, max: 0.35, color: COLORS.gfp, size: 1.4 });
@@ -3501,9 +3532,11 @@ kbd {
     ].filter(Boolean);
     if (!tags.length) return;
     ctx.save();
-    ctx.font = '600 11px "IBM Plex Mono", monospace';
+    const textScale = 1 / view.zoom;
+    ctx.font = `600 ${Math.round(11 * textScale)}px "IBM Plex Mono", monospace`;
     ctx.fillStyle = COLORS.amber;
-    ctx.fillText(tags.join('   '), 14, 22);
+    const lines = view.zoom < 0.9 ? tags : [tags.join('   ')];
+    lines.forEach((line, i) => ctx.fillText(line, 14 * textScale, (22 + i * 15) * textScale));
     ctx.restore();
   };
 
@@ -3668,7 +3701,7 @@ kbd {
       const t = 1 - p.life / p.max;
       const grow = t < 0.15 ? 0.6 + t * 4 : 1.2 - Math.min(0.2, (t - 0.15) * 0.5);
       ctx.globalAlpha = Math.min(1, (p.life / p.max) * 2.2);
-      const base = p.huge ? 30 : p.big ? 15 : 11;
+      const base = (p.huge ? 30 : p.big ? 15 : 11) / Math.sqrt(view.zoom);
       ctx.font = p.huge ? `800 ${Math.round(base * grow)}px "Bricolage Grotesque", system-ui, sans-serif` : `700 ${Math.round(base * grow)}px "IBM Plex Mono", monospace`;
       ctx.fillStyle = '#03070a';
       ctx.fillText(p.text, p.x + 1, p.y + 1);
@@ -3892,6 +3925,7 @@ kbd {
     fx.hitstop = Math.max(0, fx.hitstop - dt);
     if (game.mode !== 'paused' && !frozen) update(fx.slowmo > 0 ? dt * (0.25 + 0.75 * (1 - fx.slowmo / 0.9)) : dt);
     if (game.mode !== 'paused') stepFx(dt);
+    refreshTouch();
     draw();
     requestAnimationFrame(frame);
   };
@@ -3915,13 +3949,59 @@ kbd {
   window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
   window.addEventListener('blur', () => { stopRumble(); Object.keys(keys).forEach((k) => { keys[k] = false; }); if (game.mode === 'play') togglePause(); });
 
-  document.querySelectorAll('#pad button').forEach((btn) => {
+  document.querySelectorAll('#touch [data-key]').forEach((btn) => {
     const k = btn.dataset.key;
-    const down = (e) => { e.preventDefault(); keys[k] = true; ac(); if (game.mode === 'title' || game.mode === 'over') startGame(); };
-    const up = (e) => { e.preventDefault(); keys[k] = false; };
+    const down = (e) => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); keys[k] = true; btn.classList.add('on'); ac(); };
+    const up = (e) => { e.preventDefault(); keys[k] = false; btn.classList.remove('on'); };
     btn.addEventListener('pointerdown', down);
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => btn.addEventListener(t, up));
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => btn.addEventListener(t, up));
   });
+  document.querySelector('#touch [data-storm]').addEventListener('pointerdown', (e) => { e.preventDefault(); cytokineStorm(); });
+  document.querySelector('#touch [data-pause]').addEventListener('pointerdown', (e) => { e.preventDefault(); if (game.mode === 'play' || game.mode === 'paused') togglePause(); });
+
+  const STICK = { radius: 50, deadzone: 0.18, thrustFrom: 0.4 };
+  const stickEls = { zone: $('stickzone'), base: $('stickbase'), knob: $('stickknob'), hint: $('stickhint') };
+  const stickAt = (el, x, y) => { el.style.left = `${x}px`; el.style.top = `${y}px`; };
+  const zonePoint = (e) => {
+    const box = stageEl.getBoundingClientRect();
+    return { x: e.clientX - box.left, y: e.clientY - box.top };
+  };
+  stickEls.zone.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    stickEls.zone.setPointerCapture?.(e.pointerId);
+    const p = zonePoint(e);
+    touchStick.id = e.pointerId; touchStick.ox = p.x; touchStick.oy = p.y; touchStick.mag = 0;
+    stickAt(stickEls.base, p.x, p.y); stickAt(stickEls.knob, p.x, p.y);
+    stickEls.base.hidden = false; stickEls.knob.hidden = false; stickEls.hint.hidden = true;
+    ac();
+  });
+  stickEls.zone.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== touchStick.id) return;
+    const p = zonePoint(e);
+    const dx = p.x - touchStick.ox, dy = p.y - touchStick.oy;
+    const len = Math.hypot(dx, dy);
+    const clamped = Math.min(len, STICK.radius);
+    touchStick.angle = Math.atan2(dy, dx);
+    touchStick.mag = clamped / STICK.radius;
+    stickAt(stickEls.knob, touchStick.ox + (len ? dx / len : 0) * clamped, touchStick.oy + (len ? dy / len : 0) * clamped);
+  });
+  const releaseStick = (e) => {
+    if (e.pointerId !== touchStick.id) return;
+    touchStick.id = null; touchStick.mag = 0;
+    stickEls.base.hidden = true; stickEls.knob.hidden = true;
+  };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => stickEls.zone.addEventListener(t, releaseStick));
+
+  const touchButtons = { storm: document.querySelector('#touch [data-storm]'), lance: document.querySelector('#touch .t-lance'), bomb: document.querySelector('#touch .t-bomb') };
+  const touchLayer = $('touch');
+  const refreshTouch = () => {
+    touchLayer.classList.toggle('idle', game.mode !== 'play' && game.mode !== 'paused');
+    touchButtons.storm.hidden = !(game.overload && game.mode === 'play');
+    touchButtons.lance.classList.toggle('off', game.mode === 'play' && !hasWeapon('perforin'));
+    touchButtons.bomb.classList.toggle('off', game.mode === 'play' && game.bleach <= 0);
+    const bombLabel = game.bombCharge > 0 ? `BLEACH ${bleachLevel()?.label || ''}` : 'BLEACH';
+    if (touchButtons.bomb.textContent !== bombLabel) touchButtons.bomb.textContent = bombLabel;
+  };
 
   $('start').onclick = startGame;
   $('overloadStart').onclick = startOverload;
