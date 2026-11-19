@@ -93,6 +93,7 @@ header {
 .stage[data-biome="nerve"] { --bg: #0e0718; --grid: rgba(200,160,255,0.10); --vig: rgba(12,4,24,0.88); }
 .stage[data-biome="lymph"] { --bg: #04140f; --grid: rgba(120,255,200,0.09); --vig: rgba(2,20,14,0.88); }
 .stage[data-biome="skin"] { --bg: #1a0e0c; --grid: rgba(255,190,170,0.09); --vig: rgba(26,12,10,0.88); }
+.stage[data-biome="lab"] { --bg: #0d0f10; --grid: rgba(255,210,63,0.10); --vig: rgba(14,12,2,0.88); }
 .stage[data-biome="marrow"] { --bg: #170508; --grid: rgba(255,140,150,0.09); --vig: rgba(24,3,8,0.88); }
 canvas { position: relative; z-index: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .overlay {
@@ -558,11 +559,21 @@ footer.keys > span:not(.padstatus) { display: none; }
     { from: 6, key: 'lung', name: 'LUNG TISSUE' },
     { from: 11, key: 'gut', name: 'GUT' },
     { from: 16, key: 'nerve', name: 'NERVOUS SYSTEM' },
+    { from: 21, key: 'marrow', name: 'BONE MARROW' },
     { from: 26, key: 'lymph', name: 'LYMPH NODE' },
     { from: 31, key: 'skin', name: 'SKIN' },
-    { from: 21, key: 'marrow', name: 'BONE MARROW' },
+    { from: 36, key: 'lab', name: 'BSL-4 LAB' },
   ];
-  const biomeFor = (passage) => BIOMES.filter((b) => b.from <= passage).pop();
+  const biomeFor = (passage) => BIOMES.filter((b) => b.from <= passage).reduce((latest, b) => (b.from > latest.from ? b : latest));
+  const LAB_BIOME = BIOMES.find((b) => b.key === 'lab');
+  const biomeNow = () => (game.labLeak ? LAB_BIOME : biomeFor(game.passage));
+  const LAB = {
+    from: 36, autoclaveFrom: 37, color: '#ffd23f', steam: '#f4fbff', frost: '#9fe6ff',
+    vents: [[0.1, 0.14], [0.9, 0.86]], ventReach: 230, ventPull: 120, shipPull: 0.4, filterR: 18,
+    breachEvery: [13, 18], breachWarn: 1.8, doorLen: 110, released: [2, 3],
+    autoclaveEvery: [6, 9], autoclaveWarn: 2.2, autoclaveBlast: 0.45, autoclaveR: 95, autoclaveHurt: 30, autoclaveDamage: 4,
+    freezeSeconds: 4, freezerDrop: 0.08,
+  };
   const STRAINS = ['WT', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'κ', 'λ', 'μ'];
   const COPIES_PER_UNIT = 12400;
 
@@ -659,7 +670,8 @@ footer.keys > span:not(.padstatus) { display: none; }
     vaxT: 0, mmrT: 0, rashSlow: 0, batT: 0, mouseT: 0, mosquitoT: 0, cruiseT: 0,
     flagella: 0, superFlagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false,
     uv: 0, uvOn: false, uvEnergy: UV_ENERGY.max, uvOverheat: false,
-    overload: false, vaccinated: false, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
+    overload: false, labLeak: false, vaccinated: false, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
+    frozen: 0, door: null, breachT: 0, autoclave: null, autoclaveT: 0,
   });
   const game = {
     ...freshRun(),
@@ -912,6 +924,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     game.rash = [];
     game.vaxT = polio.length ? POLIO.vaxAfter : 0;
     game.carriers = [];
+    resetLab();
     game.whirlpools = [];
     game.hidden = [];
     game.droppings = [];
@@ -924,17 +937,17 @@ footer.keys > span:not(.padstatus) { display: none; }
     const hepSpot = edgeSpot();
     const hepatitis = hepPassage(game.passage) ? hepatitisSet(hepSpot.x, hepSpot.y).map(awayFromShip) : [];
     const newWave = Object.values(NEW_WAVE).flatMap(([from, count, make]) => (game.passage >= from ? Array.from({ length: count }, () => spot(make)) : []));
-    const bossSpec = game.overload ? null : bossFor(game.passage);
+    const bossSpec = game.overload || game.labLeak ? null : bossFor(game.passage);
     const bossSpot = edgeSpot();
     const bosses = bossSpec ? [makeBoss(bossSpec, bossSpot.x, bossSpot.y)] : [];
     if (bosses.length) setTimeout(() => announceBoss(bosses[0]), 600);
     const lambdaHosts = game.passage >= 33 ? Array.from({ length: 2 }, () => spot((x, y) => makeBacterium('ecoli', x, y))) : [];
-    game.virions = [...bosses, ...lambdaHosts, ...newWave, ...hepatitis, ...plain, ...pox, ...rhabdo, ...herpes, ...sirv, ...filo, ...bugs, ...birds, ...mimi, ...measles, ...mumps, ...rubella, ...polio, ...pandora];
+    game.virions = game.labLeak ? leakedSpecimens() : [...bosses, ...lambdaHosts, ...newWave, ...hepatitis, ...plain, ...pox, ...rhabdo, ...herpes, ...sirv, ...filo, ...bugs, ...birds, ...mimi, ...measles, ...mumps, ...rubella, ...polio, ...pandora];
     game.phageTimer = rand(14, 22);
     game.passageBanner = 2.2;
     if (game.vaccinated) game.mrna = Math.max(game.mrna || 0, MRNA.passageSeconds);
     $('strain').textContent = `STRAIN ${STRAINS[Math.min(STRAINS.length - 1, game.passage - 1)]}`;
-    enterBiome(biomeFor(game.passage));
+    enterBiome(biomeNow());
     sfx.passage();
   };
   const enterBiome = (biome) => {
@@ -946,7 +959,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     fx.pops.push({ x: view.w / 2, y: view.h / 2 + 40, text: `ENTERING ${biome.name}`, color: COLORS.ink, life: 2.6, max: 2.6, big: true });
   };
 
-  const PASSAGES = 34;
+  const PASSAGES = 40;
   const passageHint = (n) => {
     const news = {
       1: 'Starter slide',
@@ -983,6 +996,12 @@ footer.keys > span:not(.padstatus) { display: none; }
       33: 'Lambda phage: it hides in E. coli',
       34: 'Astrovirus: it bursts into stars',
       24: 'Norovirus: a cruise ship brings it',
+      35: 'The whole collection, one last time',
+      36: 'BSL-4 lab: the vents pull, the doors breach',
+      37: 'Autoclave: get clear before the steam',
+      38: 'Breaches come faster',
+      39: 'The specimen freezer is failing',
+      40: 'Total containment failure',
     }[n];
     const crowd = `${Math.min(11, 3 + n)} virions`;
     const region = biomeFor(n).name.toLowerCase();
@@ -1044,7 +1063,7 @@ footer.keys > span:not(.padstatus) { display: none; }
   const controlsHint = () => {
     if (pad.index !== null) return 'Controller: d-pad moves · <b>✕</b> selects · <b>○</b> back · <b>△</b> overload · <b>□</b> vaccine';
     if (window.matchMedia('(pointer: coarse)').matches) return 'Tap <b>Begin trial</b>. In play: drag the left side to steer, buttons on the right to fire.';
-    return 'Arrows move · <kbd>Enter</kbd> selects · <kbd>O</kbd> overload · <kbd>S</kbd> setup · <kbd>V</kbd> vaccine';
+    return 'Arrows move · <kbd>Enter</kbd> selects · <kbd>O</kbd> overload · <kbd>L</kbd> lab leak · <kbd>S</kbd> setup · <kbd>V</kbd> vaccine';
   };
   const menuHtml = () => `
     <p class="tagline">You are a macrophage. Hold the line against ${PASSAGES} passages of viruses, bacteria and parasite bosses.</p>
@@ -1052,6 +1071,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     <div class="cta"><button class="go big" id="start" type="button" data-action="start">Begin trial</button></div>
     <div class="buttons secondary">
       <button class="go alt" id="overloadStart" type="button" data-action="overload">Viral Overload</button>
+      <button class="go alt" id="labLeakStart" type="button" data-action="leak">Lab Leak</button>
       <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
       <button class="go dexbtn" type="button" data-action="setup">Trial setup</button>
     </div>
@@ -1132,7 +1152,8 @@ footer.keys > span:not(.padstatus) { display: none; }
     if (act === 'overload') startOverload();
     if (act === 'setup') showSetup();
     if (act === 'menu') showMenu();
-    if (act === 'again') begin(false, game.wantVaccine);
+    if (act === 'again') startGame();
+    if (act === 'leak') startLabLeak();
     if (act === 'vaccine') toggleVaccine();
     if (act === 'difficulty') setDifficulty(el.dataset.difficulty);
     if (act === 'step') pickPassage(game.startAt + Number(el.dataset.step));
@@ -1159,11 +1180,11 @@ footer.keys > span:not(.padstatus) { display: none; }
   const diff = () => DIFFICULTIES[game.difficulty] || DIFFICULTIES.medium;
   const weaponTier = () => WEAPONS.filter((w) => w.at <= game.passage).length;
   const hasWeapon = (key) => Boolean(diff().everything) || WEAPONS.findIndex((w) => w.key === key) < weaponTier();
-  const begin = (overload, wantVaccine = false) => {
+  const begin = ({ overload = false, labLeak = false, wantVaccine = false } = {}) => {
     fit();
     ac();
     const vaccinated = wantVaccine && !diff().noVaccines;
-    Object.assign(game, freshRun(), { mode: 'play', lives: diff().lives, passage: overload ? 1 : game.startAt, overload, vaccinated });
+    Object.assign(game, freshRun(), { mode: 'play', lives: diff().lives, passage: overload || labLeak ? 1 : game.startAt, overload, labLeak, vaccinated });
     game.ship = newShip();
     startPassage();
     if (overload) game.passageBanner = 0;
@@ -1171,8 +1192,9 @@ footer.keys > span:not(.padstatus) { display: none; }
     overlay.hidden = true;
     updateHud();
   };
-  const startGame = () => begin(false, game.wantVaccine);
-  const startOverload = () => begin(true);
+  const startGame = () => begin({ wantVaccine: game.wantVaccine });
+  const startOverload = () => begin({ overload: true });
+  const startLabLeak = () => begin({ labLeak: true, wantVaccine: game.wantVaccine });
 
   const overloadLimit = () => OVERLOAD.limitUnits * COPIES_PER_UNIT;
   const UNLOCKS = [
@@ -1223,6 +1245,129 @@ footer.keys > span:not(.padstatus) { display: none; }
     const { x, y } = edgeSpot();
     game.virions.push(...SPAWNERS[pick.kind](x, y).map(awayFromShip));
   };
+  const CARRIER_SPAWNS = ['bat', 'mosquito', 'mouse', 'cruise'];
+  const SPECIMENS = Object.keys(SPAWNERS).filter((kind) => !CARRIER_SPAWNS.includes(kind));
+  const anySpecimen = () => SPECIMENS[Math.floor(Math.random() * SPECIMENS.length)];
+  const leakedSpecimens = () => Array.from({ length: Math.min(9, 2 + game.passage) }).flatMap(() => {
+    const { x, y } = edgeSpot();
+    return SPAWNERS[anySpecimen()](x, y).map(awayFromShip);
+  });
+  const inLab = () => game.labLeak || (!game.overload && game.passage >= LAB.from);
+  const autoclaveOn = () => (game.labLeak ? game.passage >= 2 : game.passage >= LAB.autoclaveFrom);
+  const labSectors = () => game.passage - (game.labLeak ? 1 : LAB.from);
+  const breachPace = () => Math.max(0.5, 1 - labSectors() * 0.1);
+  const resetLab = () => {
+    game.door = null;
+    game.breachT = rand(...LAB.breachEvery) * 0.6;
+    game.autoclave = null;
+    game.autoclaveT = rand(...LAB.autoclaveEvery);
+  };
+
+  const ventSpots = () => LAB.vents.map(([u, w]) => ({ x: u * view.w, y: w * view.h }));
+  const nearestVent = (o) => ventSpots().reduce((best, vent) => (dist2(o, vent) < dist2(o, best) ? vent : best));
+  const suck = (o, dt, strength) => {
+    const vent = nearestVent(o);
+    const d = Math.sqrt(dist2(o, vent));
+    if (d > LAB.ventReach || d < 1) return d;
+    const pull = LAB.ventPull * strength * (1 - d / LAB.ventReach) * dt;
+    o.vx += ((vent.x - o.x) / d) * pull;
+    o.vy += ((vent.y - o.y) / d) * pull;
+    return d;
+  };
+  const hepaFilter = (v) => {
+    v.gone = true;
+    burst(v.x, v.y, colorOf(v), 8, 60);
+    pop(v.x, v.y - 16, 'HEPA FILTERED', LAB.color);
+  };
+  const stepVents = (dt) => {
+    game.virions
+      .filter((v) => v.kind !== 'boss' && suck(v, dt, 1) < LAB.filterR)
+      .forEach(hepaFilter);
+    if (game.ship) suck(game.ship, dt, LAB.shipPull);
+  };
+
+  const DOOR_SIDES = [
+    (along) => ({ x: along * view.w, y: 0, nx: 0, ny: 1 }),
+    (along) => ({ x: view.w, y: along * view.h, nx: -1, ny: 0 }),
+    (along) => ({ x: along * view.w, y: view.h, nx: 0, ny: -1 }),
+    (along) => ({ x: 0, y: along * view.h, nx: 1, ny: 0 }),
+  ];
+  const openDoor = () => {
+    const side = DOOR_SIDES[Math.floor(Math.random() * DOOR_SIDES.length)];
+    game.door = { ...side(rand(0.2, 0.8)), warn: LAB.breachWarn };
+    sfx.clink();
+  };
+  const releaseSpecimens = (door) => {
+    const x = door.x + door.nx * 30;
+    const y = door.y + door.ny * 30;
+    const escaped = Array.from({ length: Math.round(rand(...LAB.released)) }).flatMap(() => SPAWNERS[anySpecimen()](x, y));
+    escaped.forEach((v) => { v.vx += door.nx * 70; v.vy += door.ny * 70; });
+    game.virions.push(...escaped);
+    burst(x, y, LAB.color, 24, 180);
+    ring(x, y, 90, LAB.color, 0.5, 4);
+    shake(0.4);
+    sfx.phage();
+    rumble(0.4, 180);
+    fx.pops.push({ x: view.w / 2, y: view.h / 2 + 40, text: 'CONTAINMENT BREACH', color: LAB.color, life: 1.6, max: 1.6, big: true });
+  };
+  const stepBreach = (dt) => {
+    if (!game.door) {
+      game.breachT -= dt;
+      if (game.breachT <= 0) openDoor();
+      return;
+    }
+    game.door.warn -= dt;
+    if (game.door.warn > 0) return;
+    if (game.virions.length < VIRUS_CAP + 4) releaseSpecimens(game.door);
+    game.door = null;
+    game.breachT = rand(...LAB.breachEvery) * breachPace();
+  };
+
+  const blastSteam = (clave) => {
+    clave.blast = LAB.autoclaveBlast;
+    game.virions
+      .filter((v) => hits(v, v.r, clave, LAB.autoclaveR))
+      .forEach((v) => damage(v, v.x, v.y, LAB.autoclaveDamage));
+    if (game.ship && hits(game.ship, game.ship.r, clave, LAB.autoclaveR)) hurtCell(LAB.autoclaveHurt, clave);
+    burst(clave.x, clave.y, LAB.steam, 36, 240);
+    ring(clave.x, clave.y, LAB.autoclaveR * 1.3, LAB.steam, 0.5, 4);
+    flashAt(clave.x, clave.y, LAB.autoclaveR, LAB.steam, 0.2);
+    shake(0.45);
+    sfx.pop(3);
+    rumble(0.5, 200);
+  };
+  const stepAutoclave = (dt) => {
+    const clave = game.autoclave;
+    if (!clave) {
+      game.autoclaveT -= dt;
+      if (game.autoclaveT <= 0) game.autoclave = { x: rand(90, view.w - 90), y: rand(90, view.h - 90), warn: LAB.autoclaveWarn, blast: 0 };
+      return;
+    }
+    if (clave.warn > 0) {
+      clave.warn -= dt;
+      if (clave.warn <= 0) blastSteam(clave);
+      return;
+    }
+    clave.blast -= dt;
+    if (clave.blast > 0) return;
+    game.autoclave = null;
+    game.autoclaveT = rand(...LAB.autoclaveEvery);
+  };
+
+  const stepLab = (dt) => {
+    game.frozen = Math.max(0, game.frozen - dt);
+    if (!inLab()) return;
+    stepVents(dt);
+    stepBreach(dt);
+    if (autoclaveOn()) stepAutoclave(dt);
+  };
+  const deepFreeze = () => {
+    game.frozen = LAB.freezeSeconds * diff().boost;
+    game.virions.forEach((v) => { v.flash = 0.3; });
+    ring(game.ship.x, game.ship.y, Math.hypot(view.w, view.h) * 0.6, LAB.frost, 0.7, 5);
+    shake(0.3);
+  };
+
   const mmss = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
   const stepOverload = (dt) => {
     game.elapsed += dt;
@@ -1272,6 +1417,16 @@ footer.keys > span:not(.padstatus) { display: none; }
       <h2>${game.overloaded ? 'Viral<br>overload' : 'Infection<br>took hold'}</h2>
       <p>You held out for <b>${mmss(game.elapsed)}</b> and neutralised <b>${game.score.toLocaleString()}</b>. Longest hold: <b>${mmss(Math.max(bestTime, game.elapsed))}</b>.</p>`;
   };
+  const labLeakOverCard = () => {
+    const sealed = game.passage - 1;
+    const best = store.get('viral-load.leak-best', 0);
+    const isBest = sealed > best;
+    if (isBest) store.set('viral-load.leak-best', sealed);
+    return `
+      <div class="for">${isBest ? 'Most sectors sealed by Wendy' : 'Lab Leak ended'}</div>
+      <h2>Containment<br>lost</h2>
+      <p>You sealed <b>${sealed}</b> sector${sealed === 1 ? '' : 's'} and neutralised <b>${game.score.toLocaleString()}</b>. Most sealed: <b>${Math.max(best, sealed)}</b>.</p>`;
+  };
   const passageOverCard = (isBest) => `
       <div class="for">${isBest ? 'New best for Wendy' : 'Trial ended'}</div>
       <h2>Infection<br>took hold</h2>
@@ -1279,15 +1434,19 @@ footer.keys > span:not(.padstatus) { display: none; }
 
   const gameOver = () => {
     game.mode = 'over';
-    const isBest = !game.overload && game.score > game.best;
+    const trial = !game.overload && !game.labLeak;
+    const isBest = trial && game.score > game.best;
     if (isBest) { game.best = game.score; store.set('viral-load.best', game.best); }
     ui.view = 'over';
+    const story = game.overload ? overloadOverCard() : game.labLeak ? labLeakOverCard() : passageOverCard(isBest);
     const primary = game.overload
       ? '<button class="go big alt" id="againOverload" type="button" data-action="overload">Overload again</button>'
-      : '<button class="go big" id="again" type="button" data-action="again">Run it back</button>';
+      : game.labLeak
+        ? '<button class="go big alt" id="againLeak" type="button" data-action="leak">Breach again</button>'
+        : '<button class="go big" id="again" type="button" data-action="again">Run it back</button>';
     showCard(`
-      ${game.overload ? overloadOverCard() : passageOverCard(isBest)}
-      ${game.overload ? '' : `<button type="button" class="summary" data-action="setup"><span data-summary>${summaryText()}</span><span class="edit">Change</span></button>`}
+      ${story}
+      ${trial ? `<button type="button" class="summary" data-action="setup"><span data-summary>${summaryText()}</span><span class="edit">Change</span></button>` : ''}
       ${primary}
       <div class="buttons secondary">
         <button class="go dexbtn" type="button" data-action="menu">Main menu</button>
@@ -1590,7 +1749,7 @@ footer.keys > span:not(.padstatus) { display: none; }
   const dropPickup = (x, y) => {
     if (Math.random() > diff().drop) return;
     const roll = Math.random();
-    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.81 ? 'FLG' : roll < 0.84 ? 'SFG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : roll < 0.95 && game.bleach < BLEACH.max ? 'BLCH' : roll < 0.975 ? 'UV' : diff().noVaccines ? 'CD4' : 'mRNA';
+    const kind = inLab() && Math.random() < LAB.freezerDrop ? 'FRZ' : roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.81 ? 'FLG' : roll < 0.84 ? 'SFG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : roll < 0.95 && game.bleach < BLEACH.max ? 'BLCH' : roll < 0.975 ? 'UV' : diff().noVaccines ? 'CD4' : 'mRNA';
     game.pickups.push({ x, y, kind, life: 9, r: 11, vx: rand(-20, 20), vy: rand(-20, 20) });
   };
 
@@ -2739,9 +2898,9 @@ footer.keys > span:not(.padstatus) { display: none; }
     game.passageBanner = Math.max(0, game.passageBanner - dt);
     game.bits = game.bits.filter((b) => { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.97; b.vy *= 0.97; b.life -= dt; return b.life > 0; });
     game.flocks = game.flocks.filter((f) => game.virions.some((v) => v.flock === f));
-    const edt = dt * (game.mode === 'play' ? diff().speed : 1);
+    const edt = game.frozen > 0 ? 0 : dt * (game.mode === 'play' ? diff().speed : 1);
     game.flocks.forEach((f) => stepFlock(f, edt));
-    stepSputniks(dt);
+    stepSputniks(game.frozen > 0 ? 0 : dt);
     game.virions.forEach((v) => { STEPS[v.kind]?.(v, edt); v.x += v.vx * edt; v.y += v.vy * edt; v.rot += v.vr * edt; v.flash = Math.max(0, v.flash - dt); wrap(v); });
     game.virions = game.virions.filter((v) => !v.gone);
     if (game.mode !== 'play') return;
@@ -2816,6 +2975,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
     stepWhirlpools(dt);
+    stepLab(dt);
     game.confused = Math.max(0, game.confused - dt);
     game.weakened = Math.max(0, game.weakened - dt);
     stepMembrane(dt);
@@ -2878,6 +3038,7 @@ footer.keys > span:not(.padstatus) { display: none; }
         if (p.kind === 'VAX') eradicatePolio();
         if (p.kind === 'MMR') eradicateMMR();
         if (p.kind === 'CD4') callHelpers();
+        if (p.kind === 'FRZ') deepFreeze();
         if (p.kind === 'FLG' && game.flagella > 0) game.superFlagella = SUPER_FLAGELLA.seconds * diff().boost;
         if (p.kind === 'FLG') game.flagella = Math.max(game.flagella, FLAGELLA.seconds * diff().boost);
         if (p.kind === 'SFG') { game.superFlagella = SUPER_FLAGELLA.seconds * diff().boost; game.flagella = Math.max(game.flagella, game.superFlagella); }
@@ -2886,7 +3047,7 @@ footer.keys > span:not(.padstatus) { display: none; }
         if (p.kind === 'BLCH') game.bleach = Math.min(BLEACH.max, game.bleach + 1);
         sfx.pickup(); burst(p.x, p.y, COLORS.amber, 12, 90);
         ring(p.x, p.y, 60, COLORS.amber, 0.45, 3); shake(0.12);
-        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: game.superFlagella > 0 ? 'SUPER FLAGELLA!' : 'FLAGELLA: TIGHT STEERING', SFG: 'SUPER FLAGELLA!', CELL: 'MITOSIS: +1 CELL', BLCH: '+1 BLEACH BOMB', UV: 'UV-C LASER', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
+        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: game.superFlagella > 0 ? 'SUPER FLAGELLA!' : 'FLAGELLA: TIGHT STEERING', SFG: 'SUPER FLAGELLA!', CELL: 'MITOSIS: +1 CELL', BLCH: '+1 BLEACH BOMB', UV: 'UV-C LASER', mRNA: 'HOMING ANTIBODIES', FRZ: 'SPECIMEN FREEZER: −80 °C' }[p.kind] || p.kind, COLORS.amber);
         return false;
       }
       return p.life > 0;
@@ -4437,7 +4598,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1.4; ctx.stroke();
     ctx.fillStyle = COLORS.amber;
     ctx.font = '600 8px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText({ CELL: '+1', SFG: 'SF' }[p.kind] || p.kind, 0, 0.5);
+    ctx.fillText({ CELL: '+1', SFG: 'SF', FRZ: '-80' }[p.kind] || p.kind, 0, 0.5);
     ctx.restore();
   };
 
@@ -4479,7 +4640,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     ctx.fillStyle = COLORS.ink;
     ctx.textAlign = 'center';
     ctx.font = '800 34px "Bricolage Grotesque", system-ui, sans-serif';
-    ctx.fillText(`Passage ${game.passage}`, view.w / 2, view.h / 2 - 50);
+    ctx.fillText(`${game.labLeak ? 'Sector' : 'Passage'} ${game.passage}`, view.w / 2, view.h / 2 - 50);
     ctx.font = '400 12px "IBM Plex Mono", monospace';
     ctx.fillStyle = '#6f8f88';
     const variants = game.virions.filter((v) => v.variant).length;
@@ -4501,7 +4662,8 @@ footer.keys > span:not(.padstatus) { display: none; }
     const carriersDue = [batPassage(game.passage) ? 'watch for a fruit bat' : null, mousePassage(game.passage) ? 'and a deer mouse' : null].filter(Boolean).join(' ');
     const count = (n, one, many) => `${n} ${n > 1 ? many : one}`;
     const parts = [
-      count(ofKind(undefined), 'virion', 'virions'),
+      game.labLeak ? 'CONTAINMENT FAILED' : null,
+      ofKind(undefined) ? count(ofKind(undefined), 'virion', 'virions') : null,
       variants ? count(variants, 'variant', 'variants') : null,
       pox ? count(pox, 'poxvirus', 'poxviruses') : null,
       rhabdo ? count(rhabdo, 'rhabdovirus', 'rhabdoviruses') : null,
@@ -4586,6 +4748,8 @@ footer.keys > span:not(.padstatus) { display: none; }
       game.mmrT > 0 && !diff().noVaccines && game.virions.some((v) => MMR_KINDS.includes(v.kind)) ? `MMR VACCINE IN ${game.mmrT.toFixed(0)}s` : null,
       game.rashSlow > 0 ? 'RUBELLA RASH: SLOWED' : null,
       game.fatigue > 0 ? 'EPSTEIN-BARR: MONO FATIGUE' : null,
+      game.frozen > 0 ? `FROZEN AT −80 °C ${game.frozen.toFixed(0)}s` : null,
+      game.door ? 'CONTAINMENT BREACH IMMINENT' : null,
       game.stiff > 0 ? `CHIKUNGUNYA: JOINTS LOCKED ${game.stiff.toFixed(0)}s` : null,
       game.hidden.length ? 'CHICKENPOX HIDING...' : null,
       game.weakened > 0 ? `HIV: IMMUNE SYSTEM WEAKENED ${game.weakened.toFixed(0)}s` : null,
@@ -4613,6 +4777,142 @@ footer.keys > span:not(.padstatus) { display: none; }
     (groups[key] = groups[key] || []).push(item);
     return groups;
   }, {});
+  const BIOHAZARDS = [[0.22, 0.3, 80, 1], [0.74, 0.62, 110, -1], [0.45, 0.86, 60, 1]];
+  const biohazardPath = (r) => {
+    ctx.beginPath();
+    [0, 1, 2].forEach((i) => {
+      const a = i * ((Math.PI * 2) / 3) - Math.PI / 2;
+      const cx = Math.cos(a) * r * 0.42;
+      const cy = Math.sin(a) * r * 0.42;
+      ctx.moveTo(cx + r * 0.42, cy);
+      ctx.arc(cx, cy, r * 0.42, 0, Math.PI * 2);
+    });
+    ctx.moveTo(r * 0.2, 0);
+    ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2);
+    ctx.moveTo(r * 0.7, 0);
+    ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+  };
+  const drawBiohazards = () => {
+    if (quality.low || stageEl.dataset.biome !== 'lab') return;
+    ctx.save();
+    ctx.strokeStyle = LAB.color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.07;
+    BIOHAZARDS.forEach(([u, w, r, turn]) => {
+      ctx.save();
+      ctx.translate(u * view.w, w * view.h);
+      ctx.rotate(game.t * 0.05 * turn);
+      biohazardPath(r);
+      ctx.stroke();
+      ctx.restore();
+    });
+    ctx.restore();
+  };
+  const drawVent = (vent) => {
+    ctx.save();
+    ctx.translate(vent.x, vent.y);
+    ctx.strokeStyle = LAB.color;
+    [0, 0.33, 0.66].forEach((offset) => {
+      const f = (game.t * 0.6 + offset) % 1;
+      ctx.globalAlpha = 0.22 * f;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 26 + (1 - f) * LAB.ventReach * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    glowStroke(LAB.color, 2);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.rotate(game.t * 6);
+    ctx.beginPath();
+    [0, 1, 2, 3].forEach((i) => {
+      const a = (i * Math.PI) / 2;
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(Math.cos(a + 0.6) * 14, Math.sin(a + 0.6) * 14, Math.cos(a) * 19, Math.sin(a) * 19);
+    });
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+  };
+  const drawDoor = (door) => {
+    const half = LAB.doorLen / 2;
+    const along = { x: door.ny ? 1 : 0, y: door.nx ? 1 : 0 };
+    const blink = 0.55 + 0.45 * Math.abs(Math.sin(game.t * (door.warn < 0.6 ? 22 : 9)));
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(door.x - along.x * half, door.y - along.y * half);
+    ctx.lineTo(door.x + along.x * half, door.y + along.y * half);
+    glowStroke(LAB.color, 8);
+    ctx.setLineDash([10, 10]);
+    ctx.lineDashOffset = -game.t * 40;
+    ctx.strokeStyle = LAB.color;
+    ctx.stroke();
+    ctx.lineDashOffset = -game.t * 40 + 10;
+    ctx.strokeStyle = '#14120a';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = LAB.color;
+    ctx.font = '600 10px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BREACH', door.x + door.nx * 26, door.y + door.ny * 26);
+    ctx.restore();
+  };
+  const drawAutoclave = (clave) => {
+    ctx.save();
+    ctx.translate(clave.x, clave.y);
+    if (clave.warn > 0) {
+      const urgent = clave.warn < 0.8;
+      ctx.globalAlpha = 0.08 + 0.08 * Math.abs(Math.sin(game.t * (urgent ? 20 : 8)));
+      ctx.fillStyle = LAB.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, LAB.autoclaveR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.85;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = game.t * 30;
+      ctx.strokeStyle = LAB.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = LAB.color;
+      ctx.font = '600 10px "IBM Plex Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`AUTOCLAVE 121 °C · ${clave.warn.toFixed(1)}`, 0, 0);
+    } else {
+      ctx.globalAlpha = 0.5 * (clave.blast / LAB.autoclaveBlast);
+      ctx.fillStyle = LAB.steam;
+      ctx.beginPath();
+      ctx.arc(0, 0, LAB.autoclaveR * (1.15 - 0.15 * (clave.blast / LAB.autoclaveBlast)), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+  const drawLab = () => {
+    if (game.mode !== 'play' || !inLab()) return;
+    ventSpots().forEach(drawVent);
+    if (game.autoclave) drawAutoclave(game.autoclave);
+    if (game.door) drawDoor(game.door);
+  };
+  const drawFrost = () => {
+    if (game.frozen <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = 0.12 * Math.min(1, game.frozen);
+    ctx.fillStyle = LAB.frost;
+    ctx.fillRect(0, 0, view.w, view.h);
+    ctx.globalAlpha = 0.5 * Math.min(1, game.frozen);
+    ctx.strokeStyle = LAB.frost;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, view.w - 6, view.h - 6);
+    ctx.restore();
+  };
+
   const drawDust = () => {
     if (quality.low) return;
     ctx.save();
@@ -4891,6 +5191,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(view.dpr, 0, 0, view.dpr, cam.x * view.dpr, cam.y * view.dpr);
     drawDust();
+    drawBiohazards();
     drawRash();
     drawGlows();
     drawStreaks();
@@ -4898,6 +5199,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     game.pickups.forEach(drawPickup);
     game.virions.forEach(drawArriving);
     game.sputniks.forEach(drawSputnik);
+    drawLab();
     drawWhirlpools();
     drawCarriers();
     drawClouds();
@@ -4916,6 +5218,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     drawHeartbeat();
     drawHurt();
+    drawFrost();
     drawBanner();
     drawOverload();
     drawBossBar();
@@ -5031,6 +5334,7 @@ footer.keys > span:not(.padstatus) { display: none; }
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
     if (e.code === 'KeyO' && picking()) { startOverload(); return; }
+    if (e.code === 'KeyL' && picking()) { startLabLeak(); return; }
     if (e.code === 'KeyC') { cytokineStorm(); return; }
     if (e.code === 'KeyM') { audio.on = !audio.on; store.set('viral-load.sound', audio.on); return; }
     if ((e.code === 'Enter' || e.code === 'Space') && menuOpen()) { const el = document.activeElement; if (el && card.contains(el) && el.matches('button, summary')) return; e.preventDefault(); if (picking()) startGame(); return; }
@@ -5361,6 +5665,9 @@ footer.keys > span:not(.padstatus) { display: none; }
       ['Antiviral', 'A drug that interferes with the replication cycle, like a protease inhibitor.', 'Bleach and UV are disinfectants, not antivirals: they work outside the body.'],
       ['Herd immunity', 'Enough people are immune that spread stalls.', 'The Antivaxxer difficulty shows what happens without it.'],
       ['Baltimore classification', 'Sorts viruses into seven groups by genome type and how they make mRNA.', 'DNA viruses (pox, herpes) and RNA viruses (flu, polio) are all here.'],
+      ['Biosafety level', 'Labs are rated BSL-1 (harmless microbes) to BSL-4 (the most dangerous viruses), with stricter containment at each level.', 'The BSL-4 lab from passage 36, and Lab Leak mode.'],
+      ['Negative pressure', 'Lab air is kept at lower pressure than outside so it flows in, never out, and leaves through HEPA filters.', 'The lab vents pull you in and filter out any virion they swallow.'],
+      ['Autoclave', 'A pressurised steam chamber at 121 °C that sterilises lab equipment and waste.', 'The yellow warning circle in the lab: get out before the steam.'],
       ['Viral families', 'Coronaviridae, Orthomyxoviridae (flu), Retroviridae (HIV), Herpesviridae and more.', 'Norovirus is a calicivirus; Epstein-Barr is a herpesvirus.'],
     ].map(([name, real, game]) => ({ section: 'Glossary', name, tag: 'Virology term', art: glyphArt(name[0], COLORS.gfp), real, game })),
     { section: 'Bacteria', name: 'Salmonella', tag: 'Passage 7', art: virusArt(() => makeBacterium('salmonella', 0, 0), 30, (v) => { v.rot = -0.4; }),
@@ -5419,6 +5726,7 @@ footer.keys > span:not(.padstatus) { display: none; }
     { section: 'Power-ups', name: 'FLG / SF', tag: 'Flagella', art: pickupArt('FLG'), real: 'Flagella are whip-like tails that bacteria spin to swim.', game: 'Faster, tighter steering for 15 seconds. SF, or a second FLG, gives super flagella.' },
     { section: 'Power-ups', name: '+1', tag: 'Mitosis', art: pickupArt('CELL'), real: 'Mitosis is how a cell divides into two.', game: 'An extra cell, up to 7. One is guaranteed every 4th passage.' },
     { section: 'Power-ups', name: 'BLCH', tag: 'Bleach', art: pickupArt('BLCH'), real: 'Household bleach is sodium hypochlorite.', game: 'One more bleach charge (max 3).' },
+    { section: 'Power-ups', name: 'Specimen freezer', tag: 'Lab only', art: pickupArt('FRZ'), real: 'Lab specimens are stored at −80 °C, where viruses stay intact but cannot do anything.', game: 'Freezes every enemy in place for 4 seconds. Only drops in the lab.' },
     { section: 'Power-ups', name: 'UV', tag: 'Laser', art: pickupArt('UV'), real: 'UV-C is the short-wavelength ultraviolet used for disinfection.', game: '12 seconds of UV-C laser at any passage.' },
     { section: 'Power-ups', name: 'VAX', tag: 'Polio vaccine', art: pickupArt('VAX'), real: 'Polio vaccines have cut cases by over 99%.', game: 'Wipes out every polio virion.' },
     { section: 'Power-ups', name: 'MMR', tag: 'MMR vaccine', art: pickupArt('MMR'), real: 'One vaccine that protects against measles, mumps and rubella.', game: 'Wipes out all three.' },
@@ -5431,7 +5739,9 @@ footer.keys > span:not(.padstatus) { display: none; }
     { section: 'Modes', name: 'Antivaxxer', tag: 'Difficulty', art: glyphArt('A', COLORS.mcherry), real: 'Measles outbreaks follow drops in vaccination.', game: 'No vaccines at all, and measles from passage 1.' },
     { section: 'Modes', name: 'mRNA vaccine start', tag: 'Start option', art: glyphArt('V', COLORS.amber), real: 'Vaccination before exposure means a faster response.', game: 'Turn it on in Trial setup: homing antibodies for the first 12 seconds of every passage.' },
     { section: 'Modes', name: 'Viral Overload', tag: 'Endless mode', art: glyphArt('∞', COLORS.mcherry), real: 'Viral load is how much virus is in a sample.', game: 'Never ends. Keep the viral load under the red line; score is how long you last.' },
-    { section: 'Modes', name: 'Body regions', tag: 'Every 5 passages', art: glyphArt('5', COLORS.ink), real: 'Different viruses target different tissues.', game: 'The slide moves from bloodstream to lung, gut, nervous system and bone marrow.' },
+    { section: 'Modes', name: 'Lab Leak', tag: 'Endless mode', art: glyphArt('BSL', LAB.color), real: 'Real high-containment labs stack safeguards (airlocks, suits, negative pressure, HEPA filters, autoclaves) so one failure does not let anything out.', game: 'Every safeguard fails at once. Each sector releases a random mix from the whole collection, in the lab with all its hazards. Seal as many sectors as you can.' },
+    { section: 'Modes', name: 'BSL-4 lab', tag: 'Passages 36–40', art: glyphArt('4', LAB.color), real: 'Biosafety level 4 is for the most dangerous viruses, like Ebola and Nipah.', game: 'Vents pull everything toward them and filter out what they swallow. Hazard-striped doors breach and release specimens. From passage 37 an autoclave blasts steam: leave the yellow circle.' },
+    { section: 'Modes', name: 'Body regions', tag: 'Every 5 passages', art: glyphArt('5', COLORS.ink), real: 'Different viruses target different tissues.', game: 'The slide moves from bloodstream to lung, gut, nervous system, bone marrow, lymph node and skin, then into a BSL-4 lab.' },
   ];
 
   const dexEl = $('dex');

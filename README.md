@@ -9,6 +9,14 @@ The whole game is one file, `index.html`: plain canvas and Web Audio, no build s
 - Keyboard: arrows rotate and crawl, Space fires, X perforin lance, B bleach bomb, H jump, C cytokine storm (Viral Overload), P pause, M sound.
 - PS5 / standard gamepad: stick or d-pad rotate, R2 crawl, ✕ / R1 fire, □ lance, L2 bleach bomb, ○ jump, △ storm, Options pause.
 
+## Modes
+
+- **Trial:** 40 passages through seven body regions (a new one every 5 passages), with a parasite boss every fifth passage, ending in a BSL-4 lab.
+- **Viral Overload:** endless; keep the viral load under the limit.
+- **Lab Leak:** endless sectors in the lab, each releasing a random mix from the whole collection.
+
+The lab (`LAB`, `stepLab`, `drawLab`) has negative-pressure vents that pull everything in and filter virions, containment doors that breach and release specimens, an autoclave that blasts steam (from passage 37), and the specimen-freezer pickup.
+
 ## Deploy
 
 Netlify serves the repo root as-is (`netlify.toml` sets `publish = "."`); there is nothing to build.
