@@ -325,6 +325,13 @@ kbd {
   const HELPER_T = { count: 3, seconds: 16, every: 0.8, range: 260, fireBoost: 0.75 };
   const VIRUS_CAP = 22;
   const FLAGELLA = { seconds: 15, turn: 5.4, thrust: 420, drag: 0.12, maxSpeed: 400 };
+  const SUPER_FLAGELLA = { seconds: 12, turn: 7.6, thrust: 640, drag: 0.03, maxSpeed: 520 };
+  const BLEACH_SIZES = [
+    { label: 'S', cost: 1, radius: 95, damage: 2, shake: 0.4, hold: 0 },
+    { label: 'M', cost: 2, radius: 160, damage: 3, shake: 0.7, hold: 0.45 },
+    { label: 'L', cost: 3, radius: 250, damage: 5, shake: 1, hold: 0.95 },
+  ];
+  const UV_ENERGY = { max: 100, drain: 32, recharge: 20, restart: 30 };
   const BLEACH = { start: 2, max: 3, speed: 330, fuse: 0.55, radius: 150, damage: 3, cooldown: 0.6, color: '#f4ffd6' };
   const UV = { width: 6, tick: 0.13, pickupSeconds: 12, color: '#b98cff' };
   const MITOSIS = { maxCells: 7, everyPassages: 4 };
@@ -420,7 +427,7 @@ kbd {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], flagella: 0, bleach: 0, bombs: [], bombCd: 0, uv: 0, uvOn: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -720,7 +727,7 @@ kbd {
     const vaccinated = wantVaccine && !diff().noVaccines;
     Object.assign(game, {
       mode: 'play', score: 0, lives: diff().lives, passage: overload ? 1 : game.startAt, specialCd: 0, droneT: 0, announced: 1, shots: [], bits: [], pickups: [], phage: null,
-      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [], flagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, uv: 0, uvOn: false,
+      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [], flagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: UV_ENERGY.max, uvOverheat: false, superFlagella: 0,
       overload, vaccinated, mrna: 0, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
     });
     game.ship = newShip();
@@ -1027,7 +1034,7 @@ kbd {
   const dropPickup = (x, y) => {
     if (Math.random() > diff().drop) return;
     const roll = Math.random();
-    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.84 ? 'FLG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : roll < 0.95 && game.bleach < BLEACH.max ? 'BLCH' : roll < 0.975 ? 'UV' : diff().noVaccines ? 'CD4' : 'mRNA';
+    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.81 ? 'FLG' : roll < 0.84 ? 'SFG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : roll < 0.95 && game.bleach < BLEACH.max ? 'BLCH' : roll < 0.975 ? 'UV' : diff().noVaccines ? 'CD4' : 'mRNA';
     game.pickups.push({ x, y, kind, life: 9, r: 11, vx: rand(-20, 20), vy: rand(-20, 20) });
   };
 
@@ -1550,6 +1557,8 @@ kbd {
     game.spray = Math.max(game.spray, 1);
     game.mrna = Math.max(game.mrna, 1);
     game.flagella = Math.max(game.flagella, 1);
+    game.superFlagella = Math.max(game.superFlagella, 1);
+    game.uvEnergy = UV_ENERGY.max;
     if (!game.helpers.length) callHelpers();
     game.helpers.forEach((h) => { h.life = Math.max(h.life, 3); });
     game.wendyBleachT = (game.wendyBleachT ?? WENDY.bleachEvery) - dt;
@@ -1557,30 +1566,49 @@ kbd {
     game.wendyBleachT = WENDY.bleachEvery;
     game.bleach = Math.min(BLEACH.max, game.bleach + 1);
   };
+  const stepUvEnergy = (dt) => {
+    if (diff().everything) { game.uvEnergy = UV_ENERGY.max; game.uvOverheat = false; return; }
+    game.uvEnergy = game.uvOn ? game.uvEnergy - UV_ENERGY.drain * dt : Math.min(UV_ENERGY.max, game.uvEnergy + UV_ENERGY.recharge * dt);
+    if (game.uvEnergy <= 0) {
+      game.uvEnergy = 0;
+      game.uvOverheat = true;
+      game.uvOn = false;
+      pop(game.ship.x, game.ship.y - 30, 'UV OVERHEATED', UV.color);
+      sfx.clink();
+    }
+    if (game.uvOverheat && game.uvEnergy >= UV_ENERGY.restart) game.uvOverheat = false;
+  };
+  const bleachLevel = () => {
+    const affordable = BLEACH_SIZES.filter((b) => b.cost <= game.bleach);
+    return affordable.filter((b) => game.bombCharge >= b.hold).pop() || affordable[0];
+  };
   const throwBleach = () => {
     const s = game.ship;
-    game.bleach -= 1;
+    const size = bleachLevel();
+    if (!size) return;
+    game.bleach -= size.cost;
     game.bombCd = BLEACH.cooldown;
-    game.bombs.push({ x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16, vx: Math.cos(s.a) * BLEACH.speed + s.vx, vy: Math.sin(s.a) * BLEACH.speed + s.vy, fuse: BLEACH.fuse, spin: 0 });
+    game.bombs.push({ x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16, vx: Math.cos(s.a) * BLEACH.speed + s.vx, vy: Math.sin(s.a) * BLEACH.speed + s.vy, fuse: BLEACH.fuse, spin: 0, size });
     kick(s.a + Math.PI, 3);
     sfx.jump();
   };
   const detonate = (b) => {
     b.done = true;
-    game.virions.filter((v) => solid(v) && hits(b, BLEACH.radius, v, v.r * 0.5)).forEach((v) => damage(v, v.x, v.y, BLEACH.damage));
-    if (game.phage && hits(b, BLEACH.radius, game.phage, 0)) hurtPhage(game.phage.x, game.phage.y, BLEACH.damage);
-    game.carriers.filter((c) => !c.fleeing && hits(b, BLEACH.radius, c, 0)).forEach((c) => { c.hp = 1; hitCarrier(c, b); });
-    game.clouds = game.clouds.filter((c) => !hits(b, BLEACH.radius, c, 0));
-    game.rash = game.rash.filter((d) => !hits(b, BLEACH.radius, d, 0));
-    ring(b.x, b.y, BLEACH.radius, BLEACH.color, 0.55, 6);
-    ring(b.x, b.y, BLEACH.radius * 0.6, '#ffffff', 0.35, 3);
-    flashAt(b.x, b.y, BLEACH.radius * 0.9, BLEACH.color, 0.18);
+    const { radius, damage: dose } = b.size;
+    game.virions.filter((v) => solid(v) && hits(b, radius, v, v.r * 0.5)).forEach((v) => damage(v, v.x, v.y, dose));
+    if (game.phage && hits(b, radius, game.phage, 0)) hurtPhage(game.phage.x, game.phage.y, dose);
+    game.carriers.filter((c) => !c.fleeing && hits(b, radius, c, 0)).forEach((c) => { c.hp = 1; hitCarrier(c, b); });
+    game.clouds = game.clouds.filter((c) => !hits(b, radius, c, 0));
+    game.rash = game.rash.filter((d) => !hits(b, radius, d, 0));
+    ring(b.x, b.y, radius, BLEACH.color, 0.55, 6);
+    ring(b.x, b.y, radius * 0.6, '#ffffff', 0.35, 3);
+    flashAt(b.x, b.y, radius * 0.9, BLEACH.color, 0.18);
     Array.from({ length: 40 }).forEach(() => {
       const a = rand(0, Math.PI * 2); const sp = rand(60, 320);
       game.bits.push({ x: b.x, y: b.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.9), max: 0.9, color: Math.random() < 0.5 ? BLEACH.color : '#ffffff', size: rand(1.5, 3) });
     });
-    fx.bleachSplats.push({ x: b.x, y: b.y, life: 1.4, max: 1.4, seed: rand(0, 10) });
-    shake(0.7); freeze(0.08);
+    fx.bleachSplats.push({ x: b.x, y: b.y, life: 1.4, max: 1.4, seed: rand(0, 10), radius });
+    shake(b.size.shake); freeze(0.05 + b.size.cost * 0.03);
     sfx.pop(3); sfx.die();
     rumble(0.9, 350);
   };
@@ -1885,28 +1913,34 @@ kbd {
     if (s) {
       const sluggish = Math.min(game.infected > 0 ? INFECTION.sluggish : 1, game.rashSlow > 0 ? RUBELLA.rashSlow : 1);
       const whip = game.flagella > 0;
-      const turn = (whip ? FLAGELLA.turn : 3.6) * sluggish;
+      const tail = game.superFlagella > 0 ? SUPER_FLAGELLA : whip ? FLAGELLA : null;
+      const turn = (tail ? tail.turn : 3.6) * sluggish;
       const swap = game.confused > 0;
       if (held(swap ? 'right' : 'left')) s.a -= turn * dt;
       if (held(swap ? 'left' : 'right')) s.a += turn * dt;
       if (held('thrust')) {
-        const push = whip ? FLAGELLA.thrust : 260;
+        const push = tail ? tail.thrust : 260;
         s.vx += Math.cos(s.a) * push * sluggish * dt; s.vy += Math.sin(s.a) * push * sluggish * dt;
         if (Math.random() < 0.6) game.bits.push({ x: s.x - Math.cos(s.a) * 12, y: s.y - Math.sin(s.a) * 12, vx: -Math.cos(s.a + rand(-0.4, 0.4)) * 90, vy: -Math.sin(s.a + rand(-0.4, 0.4)) * 90, life: 0.35, max: 0.35, color: COLORS.gfp, size: 1.4 });
       }
-      const drag = Math.pow(whip ? FLAGELLA.drag : 0.55, dt);
+      const drag = Math.pow(tail ? tail.drag : 0.55, dt);
       s.vx *= drag; s.vy *= drag;
       const speed = Math.hypot(s.vx, s.vy);
-      const top = whip ? FLAGELLA.maxSpeed : 320;
+      const top = tail ? tail.maxSpeed : 320;
       if (speed > top) { s.vx *= top / speed; s.vy *= top / speed; }
       s.x += s.vx * dt; s.y += s.vy * dt; wrap(s);
       s.safe = Math.max(0, s.safe - dt);
-      game.uvOn = uvArmed() && held('fire') && game.amnesia <= 0;
+      game.uvOn = uvArmed() && held('fire') && game.amnesia <= 0 && !game.uvOverheat;
+      stepUvEnergy(dt);
       if (game.uvOn) uvLaser(dt);
       if ((!game.uvOn || diff().everything) && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
       game.specialCd = Math.max(0, game.specialCd - dt);
       game.bombCd = Math.max(0, game.bombCd - dt);
-      if (held('bomb') && game.bombCd <= 0 && game.bleach > 0) throwBleach();
+      const charging = held('bomb') && game.bombCd <= 0 && game.bleach > 0;
+      if (charging) game.bombCharge += dt;
+      if (!charging && game.bombHeld && game.bleach > 0) throwBleach();
+      if (!charging) game.bombCharge = 0;
+      game.bombHeld = charging;
       if (held('special') && game.specialCd <= 0 && game.amnesia <= 0 && hasWeapon('perforin')) special();
       if (held('jump') && game.jumpCooldown <= 0) { jump(); game.jumpCooldown = 1.5; keys.jump = false; }
     }
@@ -1918,6 +1952,7 @@ kbd {
     stepHelpers(dt);
     stepBombs(dt);
     game.uv = Math.max(0, game.uv - dt);
+    game.superFlagella = Math.max(0, game.superFlagella - dt);
     if (diff().everything) keepEverythingOn(dt);
     game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
@@ -1978,13 +2013,15 @@ kbd {
         if (p.kind === 'VAX') eradicatePolio();
         if (p.kind === 'MMR') eradicateMMR();
         if (p.kind === 'CD4') callHelpers();
-        if (p.kind === 'FLG') game.flagella = FLAGELLA.seconds * diff().boost;
+        if (p.kind === 'FLG' && game.flagella > 0) game.superFlagella = SUPER_FLAGELLA.seconds * diff().boost;
+        if (p.kind === 'FLG') game.flagella = Math.max(game.flagella, FLAGELLA.seconds * diff().boost);
+        if (p.kind === 'SFG') { game.superFlagella = SUPER_FLAGELLA.seconds * diff().boost; game.flagella = Math.max(game.flagella, game.superFlagella); }
         if (p.kind === 'CELL') mitosis();
         if (p.kind === 'UV') game.uv = UV.pickupSeconds * diff().boost;
         if (p.kind === 'BLCH') game.bleach = Math.min(BLEACH.max, game.bleach + 1);
         sfx.pickup(); burst(p.x, p.y, COLORS.amber, 12, 90);
         ring(p.x, p.y, 60, COLORS.amber, 0.45, 3); shake(0.12);
-        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: 'FLAGELLA: TIGHT STEERING', CELL: 'MITOSIS: +1 CELL', BLCH: '+1 BLEACH BOMB', UV: 'UV-C LASER', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
+        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: game.superFlagella > 0 ? 'SUPER FLAGELLA!' : 'FLAGELLA: TIGHT STEERING', SFG: 'SUPER FLAGELLA!', CELL: 'MITOSIS: +1 CELL', BLCH: '+1 BLEACH BOMB', UV: 'UV-C LASER', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
         return false;
       }
       return p.life > 0;
@@ -2860,18 +2897,51 @@ kbd {
       ctx.save();
       ctx.translate(s.x, s.y);
       ctx.rotate(s.a);
-      ctx.strokeStyle = COLORS.gfp; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
-      ctx.globalAlpha = game.flagella < 2 ? 0.35 + 0.4 * Math.abs(Math.sin(game.t * 14)) : 0.75;
-      const beat = held('thrust') ? 26 : 12;
-      ctx.beginPath();
-      [-5, -1.5, 2, 5.5].forEach((y0, i) => {
-        Array.from({ length: 10 }).forEach((_, k) => {
-          const x = -s.r + 1 - k * 2.6;
-          const y = y0 + Math.sin(game.t * beat + k * 0.9 + i * 1.7) * (1 + k * 0.35);
-          k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      const superTail = game.superFlagella > 0;
+      const ending = (superTail ? game.superFlagella : game.flagella) < 2;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = ending ? 0.35 + 0.4 * Math.abs(Math.sin(game.t * 14)) : superTail ? 0.95 : 0.75;
+      const beat = (held('thrust') ? 26 : 12) * (superTail ? 1.5 : 1);
+      const roots = superTail ? [-7, -5, -3, -1, 1, 3, 5, 7] : [-5, -1.5, 2, 5.5];
+      const links = superTail ? 16 : 10;
+      const trace = () => {
+        ctx.beginPath();
+        roots.forEach((y0, i) => {
+          Array.from({ length: links }).forEach((_, k) => {
+            const x = -s.r + 1 - k * 2.8;
+            const y = y0 * (1 + k * (superTail ? 0.06 : 0)) + Math.sin(game.t * beat + k * 0.9 + i * 1.7) * (1 + k * (superTail ? 0.45 : 0.35));
+            k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+          });
         });
-      });
+      };
+      if (superTail) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        trace(); ctx.strokeStyle = COLORS.gfp; ctx.lineWidth = 4.5; ctx.globalAlpha *= 0.25; ctx.stroke();
+        ctx.restore();
+      }
+      trace();
+      ctx.strokeStyle = superTail ? '#c8ffe0' : COLORS.gfp; ctx.lineWidth = superTail ? 1.6 : 1.1;
       ctx.stroke();
+      ctx.restore();
+    }
+    if (game.bombCharge > 0 && game.mode === 'play') {
+      const size = bleachLevel();
+      const reach = size ? Math.min(1, game.bombCharge / 0.95) : 0;
+      ctx.save();
+      ctx.strokeStyle = BLEACH.color; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r + 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reach); ctx.stroke();
+      ctx.font = '800 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = BLEACH.color;
+      ctx.fillText(size ? size.label : '', s.x, s.y - s.r - 22);
+      ctx.restore();
+    }
+    if (uvArmed() && !diff().everything && game.mode === 'play' && (game.uvEnergy < UV_ENERGY.max || game.uvOn)) {
+      const w = 34, fill = game.uvEnergy / UV_ENERGY.max;
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(s.x - w / 2, s.y + s.r + 10, w, 3.5);
+      ctx.fillStyle = game.uvOverheat ? COLORS.mcherry : UV.color;
+      ctx.globalAlpha = game.uvOverheat ? 0.5 + 0.5 * Math.abs(Math.sin(game.t * 12)) : 1;
+      ctx.fillRect(s.x - w / 2, s.y + s.r + 10, w * fill, 3.5);
       ctx.restore();
     }
     if (game.mrna > 0) {
@@ -2986,7 +3056,7 @@ kbd {
     ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1.4; ctx.stroke();
     ctx.fillStyle = COLORS.amber;
     ctx.font = '600 8px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.kind === 'CELL' ? '+1' : p.kind, 0, 0.5);
+    ctx.fillText({ CELL: '+1', SFG: 'SF' }[p.kind] || p.kind, 0, 0.5);
     ctx.restore();
   };
 
@@ -3164,8 +3234,10 @@ kbd {
       game.rashSlow > 0 ? 'RUBELLA RASH: SLOWED' : null,
       game.confused > 0 ? `NIPAH ENCEPHALITIS: CONTROLS SWAPPED ${game.confused.toFixed(0)}s` : null,
       game.mode === 'play' && game.uv > 0 ? `UV-C LASER ${game.uv.toFixed(0)}s · HOLD FIRE` : null,
-      game.mode === 'play' ? `BLEACH ×${game.bleach} · B / L2` : null,
-      game.flagella > 0 ? `FLAGELLA ${game.flagella.toFixed(0)}s` : null,
+      game.mode === 'play' && uvArmed() && game.uvOverheat ? 'UV OVERHEATED: RECHARGING' : null,
+      game.superFlagella > 0 ? `SUPER FLAGELLA ${game.superFlagella.toFixed(0)}s` : null,
+      game.mode === 'play' ? `BLEACH ×${game.bleach} · HOLD B / L2 FOR BIGGER` : null,
+      game.flagella > 0 && game.superFlagella <= 0 ? `FLAGELLA ${game.flagella.toFixed(0)}s` : null,
       game.helpers.length ? `HELPER T CELLS ${Math.max(...game.helpers.map((h) => h.life)).toFixed(0)}s` : null,
     ].filter(Boolean);
     if (!tags.length) return;
@@ -3312,7 +3384,7 @@ kbd {
       ctx.beginPath();
       Array.from({ length: 25 }).forEach((_, i) => {
         const a = (i / 24) * Math.PI * 2;
-        const r = BLEACH.radius * (0.75 + 0.2 * Math.sin(a * 5 + f.seed) + 0.1 * Math.sin(a * 11 + f.seed * 2)) * (1 - t * 0.3);
+        const r = f.radius * (0.75 + 0.2 * Math.sin(a * 5 + f.seed) + 0.1 * Math.sin(a * 11 + f.seed * 2)) * (1 - t * 0.3);
         i ? ctx.lineTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r) : ctx.moveTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r);
       });
       ctx.fill();
