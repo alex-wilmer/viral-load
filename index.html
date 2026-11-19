@@ -97,6 +97,8 @@ h1 span { color: var(--gfp); }
 .stage[data-biome="lung"] { --bg: #061420; --grid: rgba(170,222,255,0.11); --vig: rgba(6,18,34,0.85); }
 .stage[data-biome="gut"] { --bg: #150e05; --grid: rgba(255,200,120,0.09); --vig: rgba(24,12,2,0.88); }
 .stage[data-biome="nerve"] { --bg: #0e0718; --grid: rgba(200,160,255,0.10); --vig: rgba(12,4,24,0.88); }
+.stage[data-biome="lymph"] { --bg: #04140f; --grid: rgba(120,255,200,0.09); --vig: rgba(2,20,14,0.88); }
+.stage[data-biome="skin"] { --bg: #1a0e0c; --grid: rgba(255,190,170,0.09); --vig: rgba(26,12,10,0.88); }
 .stage[data-biome="marrow"] { --bg: #170508; --grid: rgba(255,140,150,0.09); --vig: rgba(24,3,8,0.88); }
 canvas { position: relative; z-index: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .overlay {
@@ -424,6 +426,21 @@ kbd {
   const DENGUE = { r: 11, hp: 2, score: 160, load: 1, speed: [26, 38], enhancedR: 16, enhancedSpeed: 1.8, color: '#7affd6' };
   const RHINO = { r: 10, hp: 1, score: 90, load: 1, speed: [24, 36], sneezeEvery: [3.5, 5.5], droplets: 5, spread: 0.35, dropletSpeed: 175, color: '#e0f0ff' };
   const WHIRLPOOL = { life: 8, radius: 190, pull: 300, swirl: 170, eat: 18, shipPull: 0.4, sink: 1.6, color: '#3fb6ff' };
+  const VZV = { r: 13, hp: 2, score: 160, load: 1, speed: [28, 40], hideFor: 4, color: '#ff8fa3' };
+  const SHINGLES = { r: 17, hp: 3, score: 260, load: 2, speed: [55, 70], color: '#ff4f86' };
+  const HPV = { r: 12, hp: 2, score: 170, load: 1, speed: [22, 32], wartEvery: [3.5, 5], color: '#f2c3a0' };
+  const WART = { r: 11, hp: 2, score: 60, load: 1, color: '#c9a27e' };
+  const EBV = { r: 15, hp: 3, score: 230, load: 2, speed: [20, 30], aura: 130, slow: 0.6, fire: 1.3, color: '#c8e86b' };
+  const ADENO = { r: 15, hp: 3, score: 210, load: 2, speed: [24, 34], color: '#5ce1e6' };
+  const TMV = { r: 26, halfLen: 26, thick: 4.5, hp: 1, score: 0, load: 0, speed: [26, 38], color: '#9be08a' };
+  const CRYSTAL = { r: 14, hp: 2, score: 250, load: 0, color: '#d7fbff' };
+  const RSV = { r: 11, maxR: 30, hp: 1, score: 110, load: 1, speed: [30, 44], color: '#ff9966' };
+  const CHIK = { r: 12, hp: 2, score: 180, load: 1, speed: [34, 48], stiff: 3, color: '#e8a0ff' };
+  const VIAL = { r: 14, hp: 1, score: 0, load: 0, speed: [10, 16], color: '#bfe8ff' };
+  const VARIOLA = { r: 30, hp: 6, score: 1000, load: 6, speed: 32, color: '#ff5d5d' };
+  const LAMBDA = { r: 9, hp: 1, score: 90, load: 1, speed: [36, 50], lysogenFor: 5, burstInto: 3, color: '#ffe680' };
+  const ASTRO = { r: 13, hp: 2, score: 190, load: 1, speed: [30, 42], shards: 6, shardSpeed: 190, color: '#ffc4f2' };
+  const HARMLESS = new Set(['tmv', 'crystal', 'vial']);
   const NORO = { r: 10, hp: 3, score: 130, load: 1, speed: [30, 45], color: '#ffa07a' };
   const ROTA = { r: 16, hp: 3, score: 240, load: 2, speed: 150, color: '#ffd84d' };
   const POLIO = { r: 6, hp: 1, score: 60, load: 1, speed: [80, 110], zig: [0.4, 0.9], vaxAfter: 6 };
@@ -436,6 +453,8 @@ kbd {
     { from: 6, key: 'lung', name: 'LUNG TISSUE' },
     { from: 11, key: 'gut', name: 'GUT' },
     { from: 16, key: 'nerve', name: 'NERVOUS SYSTEM' },
+    { from: 26, key: 'lymph', name: 'LYMPH NODE' },
+    { from: 31, key: 'skin', name: 'SKIN' },
     { from: 21, key: 'marrow', name: 'BONE MARROW' },
   ];
   const biomeFor = (passage) => BIOMES.filter((b) => b.from <= passage).pop();
@@ -531,7 +550,7 @@ kbd {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], whirlpools: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], whirlpools: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, hidden: [], fatigue: 0, stiff: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -646,6 +665,18 @@ kbd {
   const makeHepC = (x, y) => makeHep('hepc', x, y, { regenT: HEP.hepc.regenEvery });
   const makeHepE = (x, y) => makeHep('hepe', x, y, { dodgeT: 0 });
   const hepPassage = (passage) => passage >= 18;
+  const makeVZV = (x, y) => drifting('vzv', VZV, x, y, VZV.speed);
+  const makeShingles = (x, y) => drifting('shingles', SHINGLES, x, y, SHINGLES.speed);
+  const makeHPV = (x, y) => drifting('hpv', HPV, x, y, HPV.speed, { wartT: rand(...HPV.wartEvery) });
+  const makeWart = (x, y) => ({ kind: 'wart', x, y, size: 1, r: WART.r, hp: WART.hp, flash: 0, vx: 0, vy: 0, rot: rand(0, Math.PI * 2), vr: 0 });
+  const makeEBV = (x, y) => drifting('ebv', EBV, x, y, EBV.speed);
+  const makeAdeno = (x, y) => drifting('adeno', ADENO, x, y, ADENO.speed, { vr: rand(-0.5, 0.5) });
+  const makeTMV = (x, y) => drifting('tmv', TMV, x, y, TMV.speed, { vr: rand(-0.4, 0.4) });
+  const makeRSV = (x, y) => drifting('rsv', RSV, x, y, RSV.speed, { fuseCd: 1 });
+  const makeChik = (x, y) => drifting('chik', CHIK, x, y, CHIK.speed);
+  const makeVial = (x, y) => drifting('vial', VIAL, x, y, VIAL.speed, { vr: rand(-0.6, 0.6) });
+  const makeLambda = (x, y) => drifting('lambda', LAMBDA, x, y, LAMBDA.speed);
+  const makeAstro = (x, y) => drifting('astro', ASTRO, x, y, ASTRO.speed, { vr: rand(-1.5, 1.5) });
   const makeNoro = (x, y) => drifting('noro', NORO, x, y, NORO.speed);
   const makeHIV = (x, y) => drifting('hiv', HIV, x, y, [HIV.speed, HIV.speed], { vr: rand(-0.4, 0.4) });
   const makeCorona = (x, y) => drifting('corona', CORONA, x, y, [CORONA.speeds[0], CORONA.speeds[0]], { variant: 0 });
@@ -655,8 +686,8 @@ kbd {
     const a = rand(0, Math.PI * 2);
     return { kind: 'rota', x, y, size: 2, r: ROTA.r, hp: ROTA.hp, flash: 0, rot: 0, vr: 0, vx: Math.cos(a) * ROTA.speed, vy: Math.sin(a) * ROTA.speed };
   };
-  const NEW_WAVE = { noro: [24, 2, makeNoro], hiv: [19, 2, makeHIV], corona: [20, 2, makeCorona], dengue: [21, 2, makeDengue], rhino: [22, 3, makeRhino], rota: [23, 2, makeRota] };
-  const NEW_WAVE_NAMES = { noro: 'norovirus', hiv: 'HIV', corona: 'SARS-CoV-2', dengue: 'dengue', rhino: 'rhinovirus', rota: 'rotavirus' };
+  const NEW_WAVE = { vzv: [25, 2, makeVZV], hpv: [26, 2, makeHPV], ebv: [27, 1, makeEBV], adeno: [28, 2, makeAdeno], tmv: [29, 2, makeTMV], rsv: [30, 4, makeRSV], chik: [31, 2, makeChik], vial: [32, 1, makeVial], lambda: [33, 2, makeLambda], astro: [34, 2, makeAstro], noro: [24, 2, makeNoro], hiv: [19, 2, makeHIV], corona: [20, 2, makeCorona], dengue: [21, 2, makeDengue], rhino: [22, 3, makeRhino], rota: [23, 2, makeRota] };
+  const NEW_WAVE_NAMES = { vzv: 'chickenpox', hpv: 'HPV', ebv: 'Epstein-Barr', adeno: 'adenovirus', tmv: 'tobacco mosaic', rsv: 'RSV', chik: 'chikungunya', vial: 'a smallpox vial', lambda: 'lambda phage', astro: 'astrovirus', noro: 'norovirus', hiv: 'HIV', corona: 'SARS-CoV-2', dengue: 'dengue', rhino: 'rhinovirus', rota: 'rotavirus' };
   const mosquitoPassage = (passage) => passage >= 21;
   const cruisePassage = (passage) => passage >= 24;
   const hepatitisSet = (x, y) => {
@@ -675,12 +706,12 @@ kbd {
   const mousePassage = (passage) => passage >= 17;
   const polioCount = (passage) => (passage < 13 ? 0 : passage < 14 ? 8 : 10);
 
-  const SPECIAL = { noro: NORO, hiv: HIV, corona: CORONA, dengue: DENGUE, rhino: RHINO, rota: ROTA, ...HEP, nipah: NIPAH, hanta: HANTA, mumps: MUMPS, rubella: RUBELLA, pandora: PANDORA, mimi: MIMI, measles: MEASLES, polio: POLIO, pox: POX, rhabdo: RHABDO, di: DI, herpes: HERPES, sirv: SIRV, sirvbit: SIRV_BIT, vap: VAP, filo: FILO, flu: FLU, ...BACTERIA };
+  const SPECIAL = { vzv: VZV, shingles: SHINGLES, hpv: HPV, wart: WART, ebv: EBV, adeno: ADENO, tmv: TMV, crystal: CRYSTAL, rsv: RSV, chik: CHIK, vial: VIAL, variola: VARIOLA, lambda: LAMBDA, astro: ASTRO, noro: NORO, hiv: HIV, corona: CORONA, dengue: DENGUE, rhino: RHINO, rota: ROTA, ...HEP, nipah: NIPAH, hanta: HANTA, mumps: MUMPS, rubella: RUBELLA, pandora: PANDORA, mimi: MIMI, measles: MEASLES, polio: POLIO, pox: POX, rhabdo: RHABDO, di: DI, herpes: HERPES, sirv: SIRV, sirvbit: SIRV_BIT, vap: VAP, filo: FILO, flu: FLU, ...BACTERIA };
   const filoBodyHit = (v, p, pr) => v.kind === 'filo' && v.trail.slice(3).some((link) => hits(p, pr, link, FILO.body));
   const solid = (v) => !v.latent;
 
   const ROD = { sirv: SIRV, sirvbit: SIRV_BIT };
-  const CAPSULE = { ...ROD, ...BACTERIA };
+  const CAPSULE = { ...ROD, ...BACTERIA, tmv: TMV };
   const nearestOnRod = (v, p) => {
     const ux = Math.cos(v.rot), uy = Math.sin(v.rot);
     const half = CAPSULE[v.kind].halfLen;
@@ -757,6 +788,7 @@ kbd {
     game.vaxT = polio.length ? POLIO.vaxAfter : 0;
     game.carriers = [];
     game.whirlpools = [];
+    game.hidden = [];
     game.droppings = [];
     game.clouds = [];
     game.batT = CARRIERS.bat.first;
@@ -767,7 +799,8 @@ kbd {
     const hepSpot = edgeSpot();
     const hepatitis = hepPassage(game.passage) ? hepatitisSet(hepSpot.x, hepSpot.y).map(awayFromShip) : [];
     const newWave = Object.values(NEW_WAVE).flatMap(([from, count, make]) => (game.passage >= from ? Array.from({ length: count }, () => spot(make)) : []));
-    game.virions = [...newWave, ...hepatitis, ...plain, ...pox, ...rhabdo, ...herpes, ...sirv, ...filo, ...bugs, ...birds, ...mimi, ...measles, ...mumps, ...rubella, ...polio, ...pandora];
+    const lambdaHosts = game.passage >= 33 ? Array.from({ length: 2 }, () => spot((x, y) => makeBacterium('ecoli', x, y))) : [];
+    game.virions = [...lambdaHosts, ...newWave, ...hepatitis, ...plain, ...pox, ...rhabdo, ...herpes, ...sirv, ...filo, ...bugs, ...birds, ...mimi, ...measles, ...mumps, ...rubella, ...polio, ...pandora];
     game.phageTimer = rand(14, 22);
     game.passageBanner = 2.2;
     if (game.vaccinated) game.mrna = Math.max(game.mrna || 0, MRNA.passageSeconds);
@@ -784,7 +817,7 @@ kbd {
     fx.pops.push({ x: view.w / 2, y: view.h / 2 + 40, text: `ENTERING ${biome.name}`, color: COLORS.ink, life: 2.6, max: 2.6, big: true });
   };
 
-  const PASSAGES = 24;
+  const PASSAGES = 34;
   const passageHint = (n) => {
     const news = {
       1: 'Starter slide',
@@ -810,6 +843,16 @@ kbd {
       21: 'Dengue: a mosquito brings it',
       22: 'Rhinovirus: the common cold sneezes',
       23: 'Rotavirus: the wheel that rolls',
+      25: 'Chickenpox: it comes back as shingles',
+      26: 'HPV: it plants warts',
+      27: 'Epstein-Barr: its fatigue slows you down',
+      28: 'Adenovirus: the vaccine vector',
+      29: 'Tobacco mosaic virus: shoot to crystallise',
+      30: 'RSV: they fuse together',
+      31: 'Chikungunya: it locks your joints',
+      32: 'Smallpox: do not open the vial',
+      33: 'Lambda phage: it hides in E. coli',
+      34: 'Astrovirus: it bursts into stars',
       24: 'Norovirus: a cruise ship brings it',
     }[n];
     const crowd = `${Math.min(11, 3 + n)} virions`;
@@ -865,7 +908,7 @@ kbd {
     const vaccinated = wantVaccine && !diff().noVaccines;
     Object.assign(game, {
       mode: 'play', score: 0, lives: diff().lives, passage: overload ? 1 : game.startAt, specialCd: 0, droneT: 0, announced: 1, shots: [], bits: [], pickups: [], phage: null,
-      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, weakened: 0, helpers: [], flagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: UV_ENERGY.max, uvOverheat: false, superFlagella: 0,
+      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, weakened: 0, fatigue: 0, stiff: 0, hidden: [], helpers: [], flagella: 0, bleach: BLEACH.start, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: UV_ENERGY.max, uvOverheat: false, superFlagella: 0,
       overload, vaccinated, mrna: 0, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
     });
     game.ship = newShip();
@@ -883,7 +926,7 @@ kbd {
   const UNLOCKS = [
     { at: 0, kind: 'plain' }, { at: 15, kind: 'rhabdo' }, { at: 30, kind: 'pox' }, { at: 45, kind: 'herpes' },
     { at: 60, kind: 'flu' }, { at: 75, kind: 'salmonella' }, { at: 90, kind: 'measles' }, { at: 95, kind: 'mumps' }, { at: 100, kind: 'rubella' }, { at: 105, kind: 'filo' },
-    { at: 120, kind: 'sirv' }, { at: 135, kind: 'polio' }, { at: 150, kind: 'mimi' }, { at: 165, kind: 'pandora' }, { at: 175, kind: 'bat' }, { at: 185, kind: 'mouse' }, { at: 195, kind: 'hep' }, { at: 205, kind: 'hiv' }, { at: 215, kind: 'corona' }, { at: 225, kind: 'mosquito' }, { at: 235, kind: 'rhino' }, { at: 245, kind: 'rota' }, { at: 255, kind: 'cruise' },
+    { at: 120, kind: 'sirv' }, { at: 135, kind: 'polio' }, { at: 150, kind: 'mimi' }, { at: 165, kind: 'pandora' }, { at: 175, kind: 'bat' }, { at: 185, kind: 'mouse' }, { at: 195, kind: 'hep' }, { at: 205, kind: 'hiv' }, { at: 215, kind: 'corona' }, { at: 225, kind: 'mosquito' }, { at: 235, kind: 'rhino' }, { at: 245, kind: 'rota' }, { at: 255, kind: 'cruise' }, { at: 265, kind: 'vzv' }, { at: 275, kind: 'hpv' }, { at: 285, kind: 'rsv' }, { at: 295, kind: 'chik' }, { at: 305, kind: 'astro' },
   ];
   const SPAWNERS = {
     plain: (x, y) => [makeVirion(Math.random() < 0.5 ? 3 : 2, x, y, Math.random() < 0.25)],
@@ -909,6 +952,11 @@ kbd {
     mosquito: () => { if (!game.carriers.some((c) => c.kind === 'mosquito')) spawnCarrier('mosquito'); return []; },
     rhino: (x, y) => Array.from({ length: 2 }, () => makeRhino(x + rand(-20, 20), y + rand(-20, 20))),
     rota: (x, y) => [makeRota(x, y)],
+    vzv: (x, y) => [makeVZV(x, y)],
+    hpv: (x, y) => [makeHPV(x, y)],
+    rsv: (x, y) => Array.from({ length: 2 }, () => makeRSV(x + rand(-30, 30), y + rand(-30, 30))),
+    chik: (x, y) => [makeChik(x, y)],
+    astro: (x, y) => [makeAstro(x, y)],
     cruise: () => { if (!game.carriers.some((c) => c.kind === 'cruise')) spawnCarrier('cruise'); return []; },
     hep: (x, y) => { const pick = ['hepa', 'hepb', 'hepc', 'hepe'][Math.floor(Math.random() * 4)]; if (pick === 'hepb') { const b = makeHepB(x, y); return [b, makeHepD(b)]; } return pick === 'hepc' ? [makeHepC(x, y)] : pick === 'hepe' ? [makeHepE(x, y)] : Array.from({ length: 3 }, () => makeHep('hepa', x + rand(-20, 20), y + rand(-20, 20))); },
     mouse: () => { if (!game.carriers.some((c) => c.kind === 'mouse')) spawnCarrier('mouse'); return []; },
@@ -1054,7 +1102,7 @@ kbd {
   };
 
   const KIND_COLOR = { di: 'rhabdo', sirvbit: 'sirv', vap: 'sirv' };
-  const NEW_COLORS = { noro: NORO.color, hiv: HIV.color, corona: CORONA.color, dengue: DENGUE.color, rhino: RHINO.color, rota: ROTA.color };
+  const NEW_COLORS = { vzv: VZV.color, shingles: SHINGLES.color, hpv: HPV.color, wart: WART.color, ebv: EBV.color, adeno: ADENO.color, tmv: TMV.color, crystal: CRYSTAL.color, rsv: RSV.color, chik: CHIK.color, vial: VIAL.color, variola: VARIOLA.color, lambda: LAMBDA.color, astro: ASTRO.color, noro: NORO.color, hiv: HIV.color, corona: CORONA.color, dengue: DENGUE.color, rhino: RHINO.color, rota: ROTA.color };
   const colorOf = (v) => {
     if (BACTERIA[v.kind]) return BACTERIA[v.kind].color;
     if (NEW_COLORS[v.kind]) return NEW_COLORS[v.kind];
@@ -1216,7 +1264,12 @@ kbd {
       dropPickup(v.x, v.y);
       return;
     }
-    if (NEW_WAVE[v.kind]) {
+    if (v.kind === 'vzv') hideAsShingles(v);
+    if (v.kind === 'adeno') vectorDelivers(v);
+    if (v.kind === 'vial') openVial(v);
+    if (v.kind === 'astro') starburst(v);
+    if (v.kind === 'variola') pop(v.x, v.y - 40, 'ERADICATED. AGAIN.', VARIOLA.color);
+    if (NEW_WAVE[v.kind] || ['shingles', 'wart', 'crystal', 'variola'].includes(v.kind)) {
       burst(v.x, v.y, colorOf(v), 10 + v.r, 130);
       sfx.pop(v.r > 12 ? 2 : 1);
       return;
@@ -1770,6 +1823,109 @@ kbd {
     if ((v.y < r && v.vy < 0) || (v.y > view.h - r && v.vy > 0)) { v.vy = -v.vy; ring(v.x, v.y, 18, ROTA.color, 0.2, 1.5); }
     v.vr = (Math.hypot(v.vx, v.vy) / r) * (v.vx >= 0 ? 1 : -1);
   };
+  const makeVariola = (x, y) => drifting('variola', VARIOLA, x, y, [VARIOLA.speed, VARIOLA.speed], { vr: rand(-0.2, 0.2) });
+  const hideAsShingles = (v) => {
+    game.hidden.push({ t: VZV.hideFor });
+    pop(v.x, v.y - 22, 'CHICKENPOX GOES INTO HIDING...', VZV.color);
+  };
+  const stepHidden = (dt) => {
+    if (!game.hidden.length || game.mode !== 'play') return;
+    game.hidden.forEach((h) => { h.t -= dt; });
+    game.hidden.filter((h) => h.t <= 0).forEach(() => {
+      const { x, y } = edgeSpot();
+      const v = awayFromShip(makeShingles(x, y));
+      game.virions.push(v);
+      ring(v.x, v.y, 60, SHINGLES.color, 0.5, 3);
+      pop(v.x, v.y - 24, 'SHINGLES!', SHINGLES.color);
+      sfx.phage();
+    });
+    game.hidden = game.hidden.filter((h) => h.t > 0);
+  };
+  const vectorDelivers = (v) => {
+    game.pickups.push({ x: v.x, y: v.y, kind: diff().noVaccines ? 'CD4' : 'mRNA', life: 10, r: 11, vx: rand(-15, 15), vy: rand(-15, 15) });
+    pop(v.x, v.y - 24, 'VIRAL VECTOR: VACCINE DELIVERED', ADENO.color);
+  };
+  const openVial = (v) => {
+    const variola = makeVariola(v.x, v.y);
+    game.virions.push(variola);
+    burst(v.x, v.y, '#e6f6ff', 24, 160);
+    ring(v.x, v.y, 90, VARIOLA.color, 0.6, 4);
+    pop(v.x, v.y - 30, 'YOU OPENED THE VIAL', VARIOLA.color);
+    shake(0.6); sfx.die(); rumble(0.8, 400);
+  };
+  const starburst = (v) => {
+    Array.from({ length: ASTRO.shards }).forEach((_, i) => {
+      const a = v.rot + (i / ASTRO.shards) * Math.PI * 2;
+      game.shots.push({ x: v.x, y: v.y, vx: Math.cos(a) * ASTRO.shardSpeed, vy: Math.sin(a) * ASTRO.shardSpeed, life: 1.3, a, from: 'phage', star: true, sneeze: true });
+    });
+    pop(v.x, v.y - 20, 'STARBURST!', ASTRO.color);
+  };
+  const crystallise = (v) => {
+    Object.assign(v, { kind: 'crystal', r: CRYSTAL.r, hp: CRYSTAL.hp, vx: v.vx * 0.15, vy: v.vy * 0.15, vr: 0.4, flash: 0.25 });
+    ring(v.x, v.y, 46, CRYSTAL.color, 0.5, 3);
+    pop(v.x, v.y - 24, 'CRYSTALLISED! SHATTER IT', CRYSTAL.color);
+    sfx.clink();
+  };
+  const lockJoints = (index) => {
+    const v = game.virions[index];
+    const s = game.ship;
+    game.stiff = CHIK.stiff;
+    const away = Math.atan2(v.y - s.y, v.x - s.x);
+    v.vx = Math.cos(away) * 140; v.vy = Math.sin(away) * 140;
+    s.safe = 1.2;
+    shake(0.5); fx.hurt = 0.3; ring(s.x, s.y, 70, CHIK.color, 0.45, 3);
+    burst(s.x, s.y, CHIK.color, 16, 90);
+    sfx.die(); rumble(0.6, 260);
+  };
+  const stepHPV = (v, dt) => {
+    v.wartT -= dt;
+    if (v.wartT > 0 || game.mode !== 'play') return;
+    v.wartT = rand(...HPV.wartEvery);
+    if (!roomForVirus()) return;
+    game.virions.push(makeWart(v.x, v.y));
+    ring(v.x, v.y, 24, WART.color, 0.3, 2);
+  };
+  const stepRSV = (v, dt) => {
+    v.fuseCd -= dt;
+    if (v.fuseCd > 0 || v.gone) return;
+    const partner = game.virions.find((o) => o !== v && o.kind === 'rsv' && !o.gone && hits(v, v.r, o, o.r));
+    if (!partner) return;
+    partner.gone = true;
+    v.r = Math.min(RSV.maxR, Math.hypot(v.r, partner.r));
+    v.hp += partner.hp;
+    v.fuseCd = 0.6;
+    v.flash = 0.2;
+    ring(v.x, v.y, v.r + 20, RSV.color, 0.4, 3);
+    pop(v.x, v.y - v.r - 10, 'SYNCYTIUM!', RSV.color);
+  };
+  const stepLambda = (v) => {
+    const hosts = game.virions.filter((o) => o.kind === 'ecoli' && !(o.lysogen > 0));
+    const host = hosts.reduce((near, o) => (!near || dist2(v, o) < dist2(v, near) ? o : near), null);
+    if (!host) return;
+    if (hits(v, v.r, host, BACTERIA.ecoli.halfLen)) {
+      v.gone = true;
+      host.lysogen = LAMBDA.lysogenFor;
+      ring(host.x, host.y, 34, LAMBDA.color, 0.4, 2);
+      pop(host.x, host.y - 20, 'PROPHAGE: HIDING IN E. COLI', LAMBDA.color);
+      return;
+    }
+    const a = Math.atan2(host.y - v.y, host.x - v.x);
+    v.vx += (Math.cos(a) * 55 - v.vx) * 0.05; v.vy += (Math.sin(a) * 55 - v.vy) * 0.05;
+  };
+  const stepLysogen = (v, dt) => {
+    v.lysogen -= dt;
+    if (v.lysogen > 0) return false;
+    v.gone = true;
+    if (game.mode === 'play') game.virions.push(...Array.from({ length: LAMBDA.burstInto }, () => {
+      const kid = makeLambda(v.x, v.y);
+      const a = rand(0, Math.PI * 2);
+      kid.vx = Math.cos(a) * 70; kid.vy = Math.sin(a) * 70;
+      return kid;
+    }));
+    burst(v.x, v.y, LAMBDA.color, 18, 120);
+    pop(v.x, v.y - 20, 'LYSIS!', LAMBDA.color);
+    return true;
+  };
   const stepHepC = (v, dt) => {
     if (v.hp >= HEP.hepc.hp) { v.regenT = HEP.hepc.regenEvery; return; }
     v.regenT -= dt;
@@ -1966,6 +2122,7 @@ kbd {
     const ux = Math.cos(v.rot), uy = Math.sin(v.rot);
     const twin = makeBacterium(v.kind, v.x + ux * type.halfLen, v.y + uy * type.halfLen);
     twin.rot = v.rot + rand(-0.4, 0.4);
+    twin.lysogen = v.lysogen;
     v.x -= ux * type.halfLen * 0.5; v.y -= uy * type.halfLen * 0.5;
     game.virions.push(twin);
     burst(v.x + ux * type.halfLen * 0.5, v.y + uy * type.halfLen * 0.5, type.color, 5, 40);
@@ -1976,6 +2133,7 @@ kbd {
     v.runT = rand(...type.run);
   };
   const stepBacterium = (v, dt) => {
+    if (v.lysogen > 0 && stepLysogen(v, dt)) return;
     const type = BACTERIA[v.kind];
     v.fissionT -= dt;
     if (v.fissionT <= 0) divide(v);
@@ -2120,6 +2278,7 @@ kbd {
     if (index < 0) return;
     v.hp -= amount;
     if (v.kind === 'dengue' && !v.enhanced && v.hp > 0) enhanceDengue(v);
+    if (v.kind === 'tmv') { crystallise(v); return; }
     if (v.kind === 'pox' && v.hp <= POX.envelopeHp && v.hp + amount > POX.envelopeHp) burst(v.x, v.y, COLORS.pox, 18, 110);
     if (v.hp > 0) { v.flash = 0.18; sfx.clink(); hitFx(x, y, colorOf(v)); burst(x, y, v.kind === 'pox' ? COLORS.pox : COLORS.mcherry, 4, 60); return; }
     if (v.kind === 'corona' && escapeVariant(v)) return;
@@ -2206,7 +2365,7 @@ kbd {
     const edt = dt * (game.mode === 'play' ? diff().speed : 1);
     game.flocks.forEach((f) => stepFlock(f, edt));
     stepSputniks(dt);
-    game.virions.forEach((v) => { if (v.kind === 'pox') stepPox(v, edt); if (v.kind === 'rhabdo') stepRhabdo(v, edt); if (v.kind === 'herpes') stepHerpes(v, edt); if (v.kind === 'sirv') stepSirv(v, edt); if (v.kind === 'vap') stepVap(v, edt); if (v.kind === 'filo') stepFilo(v, edt); if (BACTERIA[v.kind]) stepBacterium(v, edt); if (v.kind === 'flu') stepBird(v); if (v.kind === 'mimi') stepMimi(v, edt); if (v.kind === 'pandora') stepPandora(v, edt); if (v.kind === 'measles') stepMeasles(v, edt); if (v.kind === 'mumps') stepMumps(v, edt); if (v.kind === 'rubella') stepRubella(v, edt); if (v.kind === 'hepc') stepHepC(v, edt); if (v.kind === 'hepd') stepHepD(v, edt); if (v.kind === 'hepe') stepHepE(v, edt); if (v.kind === 'hiv') stepHIV(v, edt); if (v.kind === 'rhino') stepRhino(v, edt); if (v.kind === 'rota') stepRota(v); if (v.kind === 'polio') stepPolio(v, edt); v.x += v.vx * edt; v.y += v.vy * edt; v.rot += v.vr * edt; v.flash = Math.max(0, v.flash - dt); wrap(v); });
+    game.virions.forEach((v) => { if (v.kind === 'pox') stepPox(v, edt); if (v.kind === 'rhabdo') stepRhabdo(v, edt); if (v.kind === 'herpes') stepHerpes(v, edt); if (v.kind === 'sirv') stepSirv(v, edt); if (v.kind === 'vap') stepVap(v, edt); if (v.kind === 'filo') stepFilo(v, edt); if (BACTERIA[v.kind]) stepBacterium(v, edt); if (v.kind === 'flu') stepBird(v); if (v.kind === 'mimi') stepMimi(v, edt); if (v.kind === 'pandora') stepPandora(v, edt); if (v.kind === 'measles') stepMeasles(v, edt); if (v.kind === 'mumps') stepMumps(v, edt); if (v.kind === 'rubella') stepRubella(v, edt); if (v.kind === 'hepc') stepHepC(v, edt); if (v.kind === 'hepd') stepHepD(v, edt); if (v.kind === 'hepe') stepHepE(v, edt); if (v.kind === 'hiv') stepHIV(v, edt); if (v.kind === 'rhino') stepRhino(v, edt); if (v.kind === 'rota') stepRota(v); if (v.kind === 'hpv') stepHPV(v, edt); if (v.kind === 'rsv') stepRSV(v, edt); if (v.kind === 'lambda') stepLambda(v); if (v.kind === 'polio') stepPolio(v, edt); v.x += v.vx * edt; v.y += v.vy * edt; v.rot += v.vr * edt; v.flash = Math.max(0, v.flash - dt); wrap(v); });
     game.virions = game.virions.filter((v) => !v.gone);
     if (game.mode !== 'play') return;
 
@@ -2224,14 +2383,15 @@ kbd {
     }
 
     if (s) {
-      const sluggish = Math.min(game.infected > 0 ? INFECTION.sluggish : 1, game.rashSlow > 0 ? RUBELLA.rashSlow : 1);
+      const sluggish = Math.min(game.fatigue > 0 ? EBV.slow : 1, game.infected > 0 ? INFECTION.sluggish : 1, game.rashSlow > 0 ? RUBELLA.rashSlow : 1);
       const whip = game.flagella > 0;
       const tail = game.superFlagella > 0 ? SUPER_FLAGELLA : whip ? FLAGELLA : null;
       const turn = (tail ? tail.turn : 3.6) * sluggish;
       const swap = game.confused > 0;
-      if (held(swap ? 'right' : 'left')) s.a -= turn * dt;
-      if (held(swap ? 'left' : 'right')) s.a += turn * dt;
-      const steering = touchStick.id !== null && touchStick.mag > STICK.deadzone;
+      const stiff = game.stiff > 0;
+      if (!stiff && held(swap ? 'right' : 'left')) s.a -= turn * dt;
+      if (!stiff && held(swap ? 'left' : 'right')) s.a += turn * dt;
+      const steering = !stiff && touchStick.id !== null && touchStick.mag > STICK.deadzone;
       if (steering) {
         const want = swap ? touchStick.angle + Math.PI : touchStick.angle;
         const step = turn * 1.5 * dt;
@@ -2253,7 +2413,7 @@ kbd {
       game.uvOn = uvArmed() && held('fire') && game.amnesia <= 0 && !game.uvOverheat;
       stepUvEnergy(dt);
       if (game.uvOn) uvLaser(dt);
-      if ((!game.uvOn || diff().everything) && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1) * (game.weakened > 0 ? HIV.weakFire : 1); }
+      if ((!game.uvOn || diff().everything) && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1) * (game.weakened > 0 ? HIV.weakFire : 1) * (game.fatigue > 0 ? EBV.fire : 1); }
       game.specialCd = Math.max(0, game.specialCd - dt);
       game.bombCd = Math.max(0, game.bombCd - dt);
       const charging = held('bomb') && game.bombCd <= 0 && game.bleach > 0;
@@ -2279,6 +2439,9 @@ kbd {
     stepWhirlpools(dt);
     game.confused = Math.max(0, game.confused - dt);
     game.weakened = Math.max(0, game.weakened - dt);
+    game.stiff = Math.max(0, game.stiff - dt);
+    game.fatigue = game.ship && game.virions.some((v) => v.kind === 'ebv' && hits(v, EBV.aura, game.ship, 0)) ? 0.3 : Math.max(0, game.fatigue - dt);
+    stepHidden(dt);
 
     game.shots.filter((b) => b.from === 'phage' && !b.sneeze).forEach((b) => {
       const prey = game.virions.findIndex((v) => v.kind === 'ecoli' && touches(v, b, 3));
@@ -2350,7 +2513,7 @@ kbd {
     });
 
     if (s && s.safe <= 0) {
-      const struckBy = game.virions.findIndex((v) => solid(v) && (touches(v, s, s.r * 0.85, 0.82) || filoBodyHit(v, s, s.r * 0.7)));
+      const struckBy = game.virions.findIndex((v) => solid(v) && !HARMLESS.has(v.kind) && (touches(v, s, s.r * 0.85, 0.82) || filoBodyHit(v, s, s.r * 0.7)));
       const rna = game.shots.find((b) => b.from === 'phage' && hits(b, 3, s, s.r));
       const phageHit = game.phage && hits(s, s.r, game.phage, game.phage.r);
       const struck = struckBy >= 0 ? game.virions[struckBy] : null;
@@ -2359,6 +2522,7 @@ kbd {
       else if (struck && struck.kind === 'measles' && game.shield <= 0) immuneAmnesia(struckBy);
       else if (struck && struck.kind === 'nipah' && game.shield <= 0) encephalitis(struckBy);
       else if (struck && struck.kind === 'hiv' && game.shield <= 0) weakenImmunity(struckBy);
+      else if (struck && struck.kind === 'chik' && game.shield <= 0) lockJoints(struckBy);
       else if (struck && game.shield > 0) splitVirion(struck, struckBy);
       else if (struck || phageHit) loseCell();
       if (rna && game.ship) { rna.life = 0; if (game.shield > 0) { sfx.clink(); } else { loseCell(); } }
@@ -2367,7 +2531,7 @@ kbd {
 
     announceWeapon();
     if (game.overload) stepOverload(dt);
-    else if (game.virions.length === 0 && game.lives > 0) { slideClear(); game.bleach = Math.min(BLEACH.max, game.bleach + 1); game.passage += 1; startPassage(); if (game.passage % MITOSIS.everyPassages === 0) dropMitosis(); }
+    else if (game.virions.length === 0 && !game.hidden.length && game.lives > 0) { slideClear(); game.bleach = Math.min(BLEACH.max, game.bleach + 1); game.passage += 1; startPassage(); if (game.passage % MITOSIS.everyPassages === 0) dropMitosis(); }
     updateHud();
   };
 
@@ -2730,6 +2894,13 @@ kbd {
   const drawBacterium = (v) => {
     const type = BACTERIA[v.kind];
     const flash = v.flash > 0;
+    if (v.lysogen > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.4 + 0.4 * Math.abs(Math.sin(game.t * (v.lysogen < 1.5 ? 16 : 5)));
+      ctx.strokeStyle = LAMBDA.color; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(v.x, v.y, type.halfLen + 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     const whip = v.tumbling > 0 ? 18 : 9;
     ctx.save();
     ctx.translate(v.x, v.y);
@@ -2938,6 +3109,165 @@ kbd {
     });
     g.fillStyle = fill; g.fill();
     g.strokeStyle = color; g.stroke();
+  };
+  const roundVirus = (g, r, color, fill, spikes, spikeLen, knob) => {
+    g.strokeStyle = color; g.fillStyle = color; g.lineWidth = 1.1;
+    Array.from({ length: spikes }).forEach((_, i) => {
+      const a = (i / spikes) * Math.PI * 2;
+      g.beginPath(); g.moveTo(Math.cos(a) * r, Math.sin(a) * r); g.lineTo(Math.cos(a) * (r + spikeLen), Math.sin(a) * (r + spikeLen)); g.stroke();
+      if (knob) { g.beginPath(); g.arc(Math.cos(a) * (r + spikeLen + knob * 0.6), Math.sin(a) * (r + spikeLen + knob * 0.6), knob, 0, Math.PI * 2); g.fill(); }
+    });
+    g.shadowColor = color; g.shadowBlur = 10; g.lineWidth = 1.8;
+    envelope(g, r, color, fill);
+    g.shadowBlur = 0;
+  };
+  const letter = (g, text, color, size) => {
+    g.fillStyle = color; g.font = `800 ${size}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, 0, 1);
+  };
+  const paintVZV = (g, flash) => {
+    const c = flash ? '#ffffff' : VZV.color;
+    roundVirus(g, VZV.r, c, 'rgba(255,143,163,0.1)', 14, 3, 0);
+    g.fillStyle = '#ff4f6d';
+    [[-4, -3], [3, -5], [5, 3], [-3, 5], [0, 0]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 1.8, 0, Math.PI * 2); g.fill(); });
+  };
+  const paintShingles = (g, flash) => {
+    const c = flash ? '#ffffff' : SHINGLES.color;
+    roundVirus(g, SHINGLES.r, c, 'rgba(255,79,134,0.12)', 18, 4, 0);
+    g.save(); g.beginPath(); g.arc(0, 0, SHINGLES.r - 1, 0, Math.PI * 2); g.clip();
+    g.globalAlpha = 0.5; g.fillStyle = '#ff9cbc'; g.fillRect(-SHINGLES.r, -3.5, SHINGLES.r * 2, 7);
+    g.restore();
+  };
+  const paintHPV = (g, flash) => {
+    const c = flash ? '#ffffff' : HPV.color, r = HPV.r;
+    g.shadowColor = HPV.color; g.shadowBlur = 9; g.strokeStyle = c; g.lineWidth = 1.6;
+    hexPath(g, r); g.fillStyle = 'rgba(242,195,160,0.1)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.fillStyle = c; g.globalAlpha = 0.8;
+    Array.from({ length: 12 }).forEach((_, i) => { const a = i * 2.4; const rr = 3 + (i % 3) * 2.6; g.beginPath(); g.arc(Math.cos(a) * rr, Math.sin(a) * rr, 1.3, 0, Math.PI * 2); g.fill(); });
+  };
+  const paintWart = (g, flash) => {
+    const c = flash ? '#ffffff' : WART.color, r = WART.r;
+    g.strokeStyle = c; g.fillStyle = 'rgba(201,162,126,0.35)'; g.lineWidth = 1.5;
+    g.beginPath();
+    Array.from({ length: 9 }).forEach((_, i) => {
+      const a = (i / 9) * Math.PI * 2;
+      g.moveTo(Math.cos(a) * r * 0.55 + r * 0.42, Math.sin(a) * r * 0.55);
+      g.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.42, 0, Math.PI * 2);
+    });
+    g.fill(); g.stroke();
+  };
+  const paintEBV = (g, flash) => {
+    const c = flash ? '#ffffff' : EBV.color;
+    roundVirus(g, EBV.r, c, 'rgba(200,232,107,0.1)', 20, 3, 0);
+    g.strokeStyle = COLORS.ink; g.lineWidth = 1.4;
+    hexPath(g, EBV.r * 0.55); g.stroke();
+    letter(g, 'z', c, 9);
+  };
+  const paintAdeno = (g, flash) => {
+    const c = flash ? '#ffffff' : ADENO.color, r = ADENO.r;
+    g.strokeStyle = c; g.fillStyle = c; g.lineWidth = 1.1;
+    Array.from({ length: 6 }).forEach((_, i) => {
+      const a = (i / 6) * Math.PI * 2;
+      g.beginPath(); g.moveTo(Math.cos(a) * r, Math.sin(a) * r); g.lineTo(Math.cos(a) * (r + 11), Math.sin(a) * (r + 11)); g.stroke();
+      g.beginPath(); g.arc(Math.cos(a) * (r + 12.5), Math.sin(a) * (r + 12.5), 2.3, 0, Math.PI * 2); g.fill();
+    });
+    g.shadowColor = ADENO.color; g.shadowBlur = 10; g.lineWidth = 1.8;
+    hexPath(g, r); g.fillStyle = 'rgba(92,225,230,0.1)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.globalAlpha = 0.5; g.lineWidth = 0.8;
+    hexPath(g, r * 0.6, Math.PI / 6); g.stroke();
+  };
+  const paintTMV = (g, flash) => {
+    const c = flash ? '#ffffff' : TMV.color, L = TMV.halfLen, W = TMV.thick;
+    g.shadowColor = TMV.color; g.shadowBlur = 8; g.strokeStyle = c; g.lineWidth = 1.5;
+    g.beginPath(); g.roundRect(-L, -W, L * 2, W * 2, 2); g.fillStyle = 'rgba(155,224,138,0.15)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.globalAlpha = 0.7; g.lineWidth = 0.9;
+    g.beginPath(); Array.from({ length: 17 }).forEach((_, i) => { const x = -L + 1 + i * 3.2; g.moveTo(x, -W); g.lineTo(x + 2, W); }); g.stroke();
+  };
+  const paintCrystal = (g, flash) => {
+    const c = flash ? '#ffffff' : CRYSTAL.color, r = CRYSTAL.r;
+    g.shadowColor = CRYSTAL.color; g.shadowBlur = 14; g.strokeStyle = c; g.lineWidth = 1.8;
+    hexPath(g, r); g.fillStyle = 'rgba(215,251,255,0.18)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.globalAlpha = 0.7; g.lineWidth = 1;
+    g.beginPath(); Array.from({ length: 6 }).forEach((_, i) => { const a = (i / 6) * Math.PI * 2; g.moveTo(0, 0); g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }); g.stroke();
+  };
+  const paintRSV = (g, flash) => roundVirus(g, RSV.maxR, flash ? '#ffffff' : RSV.color, 'rgba(255,153,102,0.1)', 26, 4, 0);
+  const paintChik = (g, flash) => {
+    const c = flash ? '#ffffff' : CHIK.color;
+    roundVirus(g, CHIK.r, c, 'rgba(232,160,255,0.1)', 12, 3, 1.6);
+    g.strokeStyle = COLORS.ink; g.lineWidth = 1.2; hexPath(g, CHIK.r * 0.55); g.stroke();
+  };
+  const paintVial = (g, flash) => {
+    const c = flash ? '#ffffff' : VIAL.color;
+    g.strokeStyle = c; g.lineWidth = 1.6; g.shadowColor = VIAL.color; g.shadowBlur = 8;
+    g.beginPath(); g.roundRect(-6, -12, 12, 24, 3); g.fillStyle = 'rgba(191,232,255,0.12)'; g.fill(); g.stroke();
+    g.shadowBlur = 0;
+    g.fillStyle = VARIOLA.color; g.fillRect(-7, -16, 14, 5);
+    g.globalAlpha = 0.6; g.fillStyle = VARIOLA.color; g.fillRect(-5, 2, 10, 9);
+    g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.font = '700 4.5px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText('VARIOLA', 0, -4);
+  };
+  const paintVariola = (g, flash) => {
+    const c = flash ? '#ffffff' : VARIOLA.color;
+    g.strokeStyle = c; g.shadowColor = VARIOLA.color; g.shadowBlur = flash ? 24 : 14; g.lineWidth = 2.2;
+    g.beginPath(); g.roundRect(-34, -25, 68, 50, 11); g.fillStyle = 'rgba(255,93,93,0.12)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.globalAlpha = 0.35; g.lineWidth = 1;
+    g.beginPath(); Array.from({ length: 6 }).forEach((_, row) => { Array.from({ length: 14 }).forEach((__, i) => { const x = -32 + i * 4.8, y = -20 + row * 8 + Math.sin(i * 1.7 + row) * 1.5; i ? g.lineTo(x, y) : g.moveTo(x, y); }); }); g.stroke();
+    g.globalAlpha = 1; g.lineWidth = 1.6; g.strokeStyle = COLORS.ink; g.fillStyle = 'rgba(3,7,10,0.85)';
+    g.beginPath(); g.moveTo(-18, -10); g.bezierCurveTo(-6, -4, 6, -4, 18, -10); g.bezierCurveTo(24, -4, 24, 4, 18, 10); g.bezierCurveTo(6, 4, -6, 4, -18, 10); g.bezierCurveTo(-24, 4, -24, -4, -18, -10); g.fill(); g.stroke();
+  };
+  const paintLambda = (g, flash) => {
+    const c = flash ? '#ffffff' : LAMBDA.color;
+    g.strokeStyle = c; g.shadowColor = LAMBDA.color; g.shadowBlur = 8; g.lineWidth = 1.5;
+    hexPath(g, 6, Math.PI / 2); g.translate(0, -4); g.translate(0, 4);
+    g.save(); g.translate(0, -5); hexPath(g, 6, Math.PI / 2); g.fillStyle = 'rgba(255,230,128,0.15)'; g.fill(); g.stroke(); g.restore();
+    g.shadowBlur = 0; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, 1); g.lineTo(0, 12); g.stroke();
+    g.beginPath(); g.moveTo(-2, 12); g.lineTo(2, 12); g.stroke();
+  };
+  const paintAstro = (g, flash) => {
+    const c = flash ? '#ffffff' : ASTRO.color, r = ASTRO.r;
+    g.shadowColor = ASTRO.color; g.shadowBlur = 10; g.strokeStyle = c; g.lineWidth = 1.7;
+    starPath(g, 0, 0, r + 3, r * 0.55, -Math.PI / 2);
+    g.fillStyle = 'rgba(255,196,242,0.12)'; g.fill(); g.stroke();
+    g.shadowBlur = 0; g.fillStyle = c;
+    Array.from({ length: 5 }).forEach((_, i) => { const a = -Math.PI / 2 + (i / 5) * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4), 1.8, 0, Math.PI * 2); g.fill(); });
+  };
+  const starShard = () => sprite('starShard', 10, (g) => {
+    g.fillStyle = ASTRO.color; g.shadowColor = ASTRO.color; g.shadowBlur = 8;
+    starPath(g, 0, 0, 5, 2.2, -Math.PI / 2); g.fill();
+  });
+  const tenSprite = (kind, paint, half) => (v) => blit(sprite(`${kind}|${v.flash > 0}`, half, (g) => paint(g, v.flash > 0)), v.x, v.y, v.rot);
+  const drawRSV = (v) => {
+    const scale = v.r / RSV.maxR;
+    ctx.save();
+    ctx.translate(v.x, v.y); ctx.scale(scale, scale);
+    blit(sprite(`rsv|${v.flash > 0}`, RSV.maxR + 12, (g) => paintRSV(g, v.flash > 0)), 0, 0, v.rot);
+    ctx.restore();
+  };
+  const drawEBV = (v) => {
+    ctx.save();
+    ctx.globalAlpha = 0.14 + 0.06 * Math.sin(game.t * 2);
+    ctx.fillStyle = EBV.color;
+    ctx.beginPath(); ctx.arc(v.x, v.y, EBV.aura, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = EBV.color; ctx.setLineDash([4, 8]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(v.x, v.y, EBV.aura, game.t * 0.3, game.t * 0.3 + Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    blit(sprite(`ebv|${v.flash > 0}`, EBV.r + 14, (g) => paintEBV(g, v.flash > 0)), v.x, v.y, v.rot);
+  };
+  const TEN_DRAW = {
+    vzv: tenSprite('vzv', paintVZV, VZV.r + 12),
+    shingles: tenSprite('shingles', paintShingles, SHINGLES.r + 14),
+    hpv: tenSprite('hpv', paintHPV, HPV.r + 10),
+    wart: tenSprite('wart', paintWart, WART.r + 10),
+    ebv: drawEBV,
+    adeno: tenSprite('adeno', paintAdeno, ADENO.r + 20),
+    tmv: tenSprite('tmv', paintTMV, TMV.halfLen + 10),
+    crystal: tenSprite('crystal', paintCrystal, CRYSTAL.r + 14),
+    rsv: drawRSV,
+    chik: tenSprite('chik', paintChik, CHIK.r + 14),
+    vial: tenSprite('vial', paintVial, 22),
+    variola: tenSprite('variola', paintVariola, 52),
+    lambda: tenSprite('lambda', paintLambda, 18),
+    astro: tenSprite('astro', paintAstro, ASTRO.r + 14),
   };
   const paintNoro = (g, flash) => {
     const r = NORO.r, color = flash ? '#ffffff' : NORO.color;
@@ -3355,6 +3685,7 @@ kbd {
   const drawVirion = (v) => {
     if (v.kind === 'pandora') { drawPandora(v); return; }
     if (HEP[v.kind]) { drawHep(v); return; }
+    if (TEN_DRAW[v.kind]) { TEN_DRAW[v.kind](v); return; }
     if (v.kind === 'noro') { drawNoro(v); return; }
     if (v.kind === 'hiv') { drawHIV(v); return; }
     if (v.kind === 'corona') { drawCorona(v); return; }
@@ -3522,6 +3853,7 @@ kbd {
     g.beginPath(); g.moveTo(0, -4.5); g.bezierCurveTo(3.5, -1, 3.5, 3.5, 0, 3.8); g.bezierCurveTo(-3.5, 3.5, -3.5, -1, 0, -4.5); g.fill();
   });
   const drawShot = (b) => {
+    if (b.star) { blit(starShard(), b.x, b.y, game.t * 12); return; }
     if (b.sneeze) { blit(droplet(), b.x, b.y, b.a + Math.PI / 2); return; }
     const s = b.from === 'ship' ? antibody() : rna(Math.floor(game.t * 18 / (Math.PI * 2) * RNA_FRAMES) % RNA_FRAMES);
     blit(s, b.x, b.y, b.a + Math.PI / 2);
@@ -3735,6 +4067,9 @@ kbd {
       game.vaxT > 0 && !diff().noVaccines && game.virions.some((v) => v.kind === 'polio') ? `POLIO VACCINE IN ${game.vaxT.toFixed(0)}s` : null,
       game.mmrT > 0 && !diff().noVaccines && game.virions.some((v) => MMR_KINDS.includes(v.kind)) ? `MMR VACCINE IN ${game.mmrT.toFixed(0)}s` : null,
       game.rashSlow > 0 ? 'RUBELLA RASH: SLOWED' : null,
+      game.fatigue > 0 ? 'EPSTEIN-BARR: MONO FATIGUE' : null,
+      game.stiff > 0 ? `CHIKUNGUNYA: JOINTS LOCKED ${game.stiff.toFixed(0)}s` : null,
+      game.hidden.length ? 'CHICKENPOX HIDING...' : null,
       game.weakened > 0 ? `HIV: IMMUNE SYSTEM WEAKENED ${game.weakened.toFixed(0)}s` : null,
       game.confused > 0 ? `NIPAH ENCEPHALITIS: CONTROLS SWAPPED ${game.confused.toFixed(0)}s` : null,
       game.mode === 'play' && game.uv > 0 ? `UV-C LASER ${game.uv.toFixed(0)}s · HOLD FIRE` : null,
@@ -3793,7 +4128,7 @@ kbd {
     ctx.lineCap = 'round';
     game.shots.forEach((b) => {
       const mine = b.from === 'ship';
-      ctx.strokeStyle = b.homing ? COLORS.amber : mine ? COLORS.gfp : b.sneeze ? RHINO.color : COLORS.mcherry;
+      ctx.strokeStyle = b.star ? ASTRO.color : b.homing ? COLORS.amber : mine ? COLORS.gfp : b.sneeze ? RHINO.color : COLORS.mcherry;
       ctx.globalAlpha = 0.35;
       ctx.lineWidth = mine ? 3 : 2.5;
       ctx.beginPath();
@@ -3999,7 +4334,7 @@ kbd {
     drawVirion(v);
     ctx.restore();
   };
-  const RIM = { speed: 1.6, arc: 0.9, skip: new Set(['filo', 'sirv', 'sirvbit', 'rhabdo', 'di', 'salmonella', 'ecoli', 'vap']) };
+  const RIM = { speed: 1.6, arc: 0.9, skip: new Set(['filo', 'sirv', 'sirvbit', 'rhabdo', 'di', 'salmonella', 'ecoli', 'vap', 'tmv', 'vial', 'wart', 'astro']) };
   const rimLight = (v) => {
     if (quality.low || v.latent || RIM.skip.has(v.kind) || v.r < 8) return;
     const a = game.t * RIM.speed + (v.seenAt || 0) * 7.3;
@@ -4405,6 +4740,36 @@ kbd {
       real: 'A calicivirus ("calici" means cup, for the cup-shaped hollows on its surface). Famous for cruise-ship outbreaks; it survives alcohol hand sanitiser, but bleach kills it.',
       game: 'Spilled by a cruise ship. 3 hits each, but bleach kills it outright.' },
 
+    { section: 'Viruses', name: 'Chickenpox → shingles', tag: 'Passage 25', art: virusArt(() => makeVZV(0, 0), 20),
+      real: 'Varicella-zoster virus causes chickenpox, then hides in nerve cells for decades and can return as shingles, a painful band-shaped rash.',
+      game: 'Killing it sends it into hiding. A few seconds later it bursts back as shingles: bigger, faster, 3 hits.' },
+    { section: 'Viruses', name: 'HPV', tag: 'Passage 26', art: virusArt(() => makeHPV(0, 0), 18),
+      real: 'Human papillomavirus causes warts and some cancers. The HPV vaccine prevents most of them.',
+      game: 'Plants warts as it drifts: stationary lumps that block shots and hurt to touch. 2 hits each.' },
+    { section: 'Viruses', name: 'Epstein-Barr', tag: 'Passage 27', art: virusArt(() => makeEBV(0, 0), 26),
+      real: 'A herpesvirus that causes mono ("the kissing disease"), famous for weeks of exhaustion.',
+      game: 'Surrounded by a fatigue aura. Inside it you move slowly and fire slower. 3 hits.' },
+    { section: 'Viruses', name: 'Adenovirus', tag: 'Passage 28', art: virusArt(() => makeAdeno(0, 0), 30),
+      real: 'Causes colds and pink eye. Its long fibres grab cells, and harmless versions are used as vaccine vectors.',
+      game: '3 hits. Killing it always drops a vaccine (homing antibodies).' },
+    { section: 'Viruses', name: 'Tobacco mosaic virus', tag: 'Passage 29', art: virusArt(() => makeTMV(0, 0), 30, (v) => { v.rot = -0.4; }),
+      real: 'The first virus ever discovered (1890s). It infects plants, not people, and in 1935 Wendell Stanley crystallised it.',
+      game: 'Harmless to touch. Shooting it turns it into a crystal; shatter the crystal for 250 points.' },
+    { section: 'Viruses', name: 'RSV', tag: 'Passage 30', art: virusArt(() => makeRSV(0, 0), 18),
+      real: 'Respiratory syncytial virus makes infected cells fuse into giant multi-cell blobs called syncytia.',
+      game: 'When two touch they fuse into one bigger RSV with both their hit points. Kill them before they merge.' },
+    { section: 'Viruses', name: 'Chikungunya', tag: 'Passage 31', art: virusArt(() => makeChik(0, 0), 20),
+      real: 'A mosquito-borne virus whose name means "that which bends up", for the severe joint pain it causes.',
+      game: 'Touching it locks your joints: you cannot turn for 3 seconds.' },
+    { section: 'Viruses', name: 'Smallpox', tag: 'Passage 32', art: virusArt(() => makeVial(0, 0), 22),
+      real: 'Eradicated worldwide in 1980, the only human disease ever wiped out. Samples survive in just two labs.',
+      game: 'A sealed vial drifts by. Shoot it and huge variola escapes: 6 hits, 1000 points.' },
+    { section: 'Viruses', name: 'Lambda phage', tag: 'Passage 33', art: virusArt(() => makeLambda(0, 0), 16),
+      real: 'A phage that can hide its DNA inside E. coli’s genome (lysogeny), then later burst out (lysis).',
+      game: 'Hunts E. coli and hides inside it. The infected bacterium glows, then bursts into three new phages.' },
+    { section: 'Viruses', name: 'Astrovirus', tag: 'Passage 34', art: virusArt(() => makeAstro(0, 0), 20, (v) => { v.rot = game.t; }),
+      real: 'Named for its star-like look under the electron microscope. A common cause of stomach bugs in children.',
+      game: 'When it dies it bursts into six star shards that fly outward and can hit you.' },
     { section: 'Bacteria', name: 'Salmonella', tag: 'Passage 7', art: virusArt(() => makeBacterium('salmonella', 0, 0), 30, (v) => { v.rot = -0.4; }),
       real: 'A rod-shaped bacterium with flagella all over. It can survive inside the macrophages that swallow it.',
       game: 'Chases you and divides. Touch it and you swallow it, but it slows you down for 6 seconds and then two burst out of you.' },
