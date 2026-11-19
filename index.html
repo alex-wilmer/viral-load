@@ -231,7 +231,7 @@ kbd {
         <p class="small">Keyboard: <kbd>Enter</kbd> start · <kbd>V</kbd> vaccinated · <kbd>O</kbd> overload · arrows pick. PS5: press any button first, then <b>✕</b> start · <b>□</b> vaccinated · <b>△</b> overload · d-pad picks.</p>
         <details class="how">
           <summary>How to play</summary>
-          <p>You are a macrophage on a glass slide. Fire <b>antibodies</b> at the virions; each hit splits a capsid into smaller particles until nothing is left. <b>Variants</b> glow red and take two hits. Catch <b>IFN</b> for a shield, <b>mAb</b> for a three-way spray and <b>mRNA</b> for homing antibodies.</p>
+          <p>You are a macrophage on a glass slide. Fire <b>antibodies</b> at the virions; each hit splits a capsid into smaller particles until nothing is left. <b>Variants</b> glow red and take two hits. Catch <b>IFN</b> for a shield, <b>mAb</b> for a three-way spray, <b>mRNA</b> for homing antibodies, <b>CD4</b> for helper T cells, <b>FLG</b> for flagella (faster, tighter steering) and <b>+1</b> for an extra cell (mitosis).</p>
           <p>New viruses arrive every passage, and so do new weapons: the <b>complement cascade</b> (passage 3), the <b>perforin lance</b> on <kbd>X</kbd> / <b>□</b> (5), <b>phage therapy</b> drones (8) and the <b>neutrophil NET</b> (11).</p>
           <p>The <b>mRNA vaccine</b> start gives you homing antibodies for the first 12 seconds of every passage. <b>Viral Overload</b> never ends: keep the viral load under the red line, and spend a cell on a <b>cytokine storm</b> (<kbd>C</kbd> / <b>△</b>) when it gets bad.</p>
         </details>
@@ -283,7 +283,7 @@ kbd {
   const BACTERIA_CAP = 20;
   const DIFFICULTIES = {
     easy: { label: 'Immunebooster', lives: 5, speed: 0.75, fire: 0.14, drop: 0.25, boost: 1.3, blurb: '5 cells, slower viruses, more power-ups' },
-    medium: { label: 'Medium', lives: 3, speed: 1, fire: 0.17, drop: 0.14, boost: 1, blurb: 'The standard trial' },
+    medium: { label: 'Healthy Specimen', lives: 3, speed: 1, fire: 0.17, drop: 0.14, boost: 1, blurb: 'The standard trial' },
     immuno: { label: 'Immunocompromised', lives: 2, speed: 1.15, fire: 0.21, drop: 0.09, boost: 0.6, blurb: '2 cells, slower antibodies, weaker power-ups' },
     antivax: { label: 'Antivaxxer', lives: 3, speed: 1.2, fire: 0.17, drop: 0.14, boost: 1, noVaccines: true, outbreak: true, blurb: 'No vaccines at all, and measles from passage 1' },
   };
@@ -318,6 +318,8 @@ kbd {
   const DROPPING = { fuse: 2, virions: 2, cloudLife: 6, cloudR: 46 };
   const HELPER_T = { count: 3, seconds: 16, every: 0.8, range: 260, fireBoost: 0.75 };
   const VIRUS_CAP = 22;
+  const FLAGELLA = { seconds: 15, turn: 5.4, thrust: 420, drag: 0.12, maxSpeed: 400 };
+  const MITOSIS = { maxCells: 7, everyPassages: 4 };
   const HEP = {
     hepa: { letter: 'A', color: '#ffb86b', r: 8, hp: 1, score: 60, load: 1, speed: [55, 75], shape: 'hex' },
     hepb: { letter: 'B', color: '#ff7b54', r: 14, hp: 2, score: 180, load: 2, speed: [24, 34], shape: 'spiky', decoys: 4, decoyOrbit: 27, decoyR: 5 },
@@ -410,7 +412,7 @@ kbd {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, helpers: [], flagella: 0, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -710,7 +712,7 @@ kbd {
     const vaccinated = wantVaccine && !diff().noVaccines;
     Object.assign(game, {
       mode: 'play', score: 0, lives: diff().lives, passage: overload ? 1 : game.startAt, specialCd: 0, droneT: 0, announced: 1, shots: [], bits: [], pickups: [], phage: null,
-      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [],
+      shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, confused: 0, helpers: [], flagella: 0,
       overload, vaccinated, mrna: 0, elapsed: 0, spawnT: OVERLOAD.firstSpawn, storm: 0, stormFlash: 0, overloaded: false,
     });
     game.ship = newShip();
@@ -1016,7 +1018,7 @@ kbd {
   const dropPickup = (x, y) => {
     if (Math.random() > diff().drop) return;
     const roll = Math.random();
-    const kind = roll < 0.35 ? 'IFN' : roll < 0.7 ? 'mAb' : roll < 0.85 ? 'CD4' : diff().noVaccines ? 'CD4' : 'mRNA';
+    const kind = roll < 0.28 ? 'IFN' : roll < 0.56 ? 'mAb' : roll < 0.7 ? 'CD4' : roll < 0.84 ? 'FLG' : roll < 0.9 && game.lives < MITOSIS.maxCells ? 'CELL' : diff().noVaccines ? 'CD4' : 'mRNA';
     game.pickups.push({ x, y, kind, life: 9, r: 11, vx: rand(-20, 20), vy: rand(-20, 20) });
   };
 
@@ -1494,6 +1496,21 @@ kbd {
     return true;
   };
 
+  const mitosis = () => {
+    const s = game.ship;
+    game.lives = Math.min(MITOSIS.maxCells, game.lives + 1);
+    updateHud();
+    if (!s) return;
+    ring(s.x, s.y, 110, COLORS.gfp, 0.6, 4);
+    flashAt(s.x, s.y, 50, COLORS.gfp, 0.15);
+    burst(s.x, s.y, COLORS.gfp, 20, 120);
+    shake(0.2);
+  };
+  const dropMitosis = () => {
+    if (game.lives >= MITOSIS.maxCells) return;
+    game.pickups.push({ x: rand(80, view.w - 80), y: rand(80, view.h - 80), kind: 'CELL', life: 14, r: 12, vx: rand(-15, 15), vy: rand(-15, 15) });
+  };
+
   const stepVaccine = (dt) => {
     if (diff().noVaccines) return;
     if (game.vaxT <= 0) return;
@@ -1767,18 +1784,21 @@ kbd {
 
     if (s) {
       const sluggish = Math.min(game.infected > 0 ? INFECTION.sluggish : 1, game.rashSlow > 0 ? RUBELLA.rashSlow : 1);
-      const turn = 3.6 * sluggish;
+      const whip = game.flagella > 0;
+      const turn = (whip ? FLAGELLA.turn : 3.6) * sluggish;
       const swap = game.confused > 0;
       if (held(swap ? 'right' : 'left')) s.a -= turn * dt;
       if (held(swap ? 'left' : 'right')) s.a += turn * dt;
       if (held('thrust')) {
-        s.vx += Math.cos(s.a) * 260 * sluggish * dt; s.vy += Math.sin(s.a) * 260 * sluggish * dt;
+        const push = whip ? FLAGELLA.thrust : 260;
+        s.vx += Math.cos(s.a) * push * sluggish * dt; s.vy += Math.sin(s.a) * push * sluggish * dt;
         if (Math.random() < 0.6) game.bits.push({ x: s.x - Math.cos(s.a) * 12, y: s.y - Math.sin(s.a) * 12, vx: -Math.cos(s.a + rand(-0.4, 0.4)) * 90, vy: -Math.sin(s.a + rand(-0.4, 0.4)) * 90, life: 0.35, max: 0.35, color: COLORS.gfp, size: 1.4 });
       }
-      const drag = Math.pow(0.55, dt);
+      const drag = Math.pow(whip ? FLAGELLA.drag : 0.55, dt);
       s.vx *= drag; s.vy *= drag;
       const speed = Math.hypot(s.vx, s.vy);
-      if (speed > 320) { s.vx *= 320 / speed; s.vy *= 320 / speed; }
+      const top = whip ? FLAGELLA.maxSpeed : 320;
+      if (speed > top) { s.vx *= top / speed; s.vy *= top / speed; }
       s.x += s.vx * dt; s.y += s.vy * dt; wrap(s);
       s.safe = Math.max(0, s.safe - dt);
       if (held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
@@ -1792,6 +1812,7 @@ kbd {
     game.shots = game.shots.filter((b) => { const st = b.from === 'phage' ? edt : dt; b.x += b.vx * st; b.y += b.vy * st; b.life -= st; wrap(b); return b.life > 0; });
     stepDrones(dt);
     stepHelpers(dt);
+    game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
     game.confused = Math.max(0, game.confused - dt);
 
@@ -1850,9 +1871,11 @@ kbd {
         if (p.kind === 'VAX') eradicatePolio();
         if (p.kind === 'MMR') eradicateMMR();
         if (p.kind === 'CD4') callHelpers();
+        if (p.kind === 'FLG') game.flagella = FLAGELLA.seconds * diff().boost;
+        if (p.kind === 'CELL') mitosis();
         sfx.pickup(); burst(p.x, p.y, COLORS.amber, 12, 90);
         ring(p.x, p.y, 60, COLORS.amber, 0.45, 3); shake(0.12);
-        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
+        pop(p.x, p.y - 14, { IFN: 'SHIELD', mAb: 'SPRAY', VAX: 'ERADICATED', MMR: 'MMR: ALL THREE GONE', CD4: 'HELPER T CELLS', FLG: 'FLAGELLA: TIGHT STEERING', CELL: 'MITOSIS: +1 CELL', mRNA: 'HOMING ANTIBODIES' }[p.kind] || p.kind, COLORS.amber);
         return false;
       }
       return p.life > 0;
@@ -1875,7 +1898,7 @@ kbd {
 
     announceWeapon();
     if (game.overload) stepOverload(dt);
-    else if (game.virions.length === 0 && game.lives > 0) { slideClear(); game.passage += 1; startPassage(); }
+    else if (game.virions.length === 0 && game.lives > 0) { slideClear(); game.passage += 1; startPassage(); if (game.passage % MITOSIS.everyPassages === 0) dropMitosis(); }
     updateHud();
   };
 
@@ -2724,6 +2747,24 @@ kbd {
       ctx.stroke();
     }
     ctx.restore();
+    if (game.flagella > 0) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.a);
+      ctx.strokeStyle = COLORS.gfp; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+      ctx.globalAlpha = game.flagella < 2 ? 0.35 + 0.4 * Math.abs(Math.sin(game.t * 14)) : 0.75;
+      const beat = held('thrust') ? 26 : 12;
+      ctx.beginPath();
+      [-5, -1.5, 2, 5.5].forEach((y0, i) => {
+        Array.from({ length: 10 }).forEach((_, k) => {
+          const x = -s.r + 1 - k * 2.6;
+          const y = y0 + Math.sin(game.t * beat + k * 0.9 + i * 1.7) * (1 + k * 0.35);
+          k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        });
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
     if (game.mrna > 0) {
       ctx.save();
       ctx.translate(s.x, s.y);
@@ -2836,7 +2877,7 @@ kbd {
     ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1.4; ctx.stroke();
     ctx.fillStyle = COLORS.amber;
     ctx.font = '600 8px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.kind, 0, 0.5);
+    ctx.fillText(p.kind === 'CELL' ? '+1' : p.kind, 0, 0.5);
     ctx.restore();
   };
 
@@ -3005,6 +3046,7 @@ kbd {
       game.mmrT > 0 && !diff().noVaccines && game.virions.some((v) => MMR_KINDS.includes(v.kind)) ? `MMR VACCINE IN ${game.mmrT.toFixed(0)}s` : null,
       game.rashSlow > 0 ? 'RUBELLA RASH: SLOWED' : null,
       game.confused > 0 ? `NIPAH ENCEPHALITIS: CONTROLS SWAPPED ${game.confused.toFixed(0)}s` : null,
+      game.flagella > 0 ? `FLAGELLA ${game.flagella.toFixed(0)}s` : null,
       game.helpers.length ? `HELPER T CELLS ${Math.max(...game.helpers.map((h) => h.life)).toFixed(0)}s` : null,
     ].filter(Boolean);
     if (!tags.length) return;
