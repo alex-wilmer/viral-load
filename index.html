@@ -423,6 +423,7 @@ kbd {
   const CORONA = { r: 15, hp: 1, score: 150, load: 2, speeds: [32, 48, 66], variants: ['WT', 'Δ', 'Ο'], color: '#ff6f61' };
   const DENGUE = { r: 11, hp: 2, score: 160, load: 1, speed: [26, 38], enhancedR: 16, enhancedSpeed: 1.8, color: '#7affd6' };
   const RHINO = { r: 10, hp: 1, score: 90, load: 1, speed: [24, 36], sneezeEvery: [3.5, 5.5], droplets: 5, spread: 0.35, dropletSpeed: 175, color: '#e0f0ff' };
+  const WHIRLPOOL = { life: 8, radius: 190, pull: 300, swirl: 170, eat: 18, shipPull: 0.4, sink: 1.6, color: '#3fb6ff' };
   const NORO = { r: 10, hp: 3, score: 130, load: 1, speed: [30, 45], color: '#ffa07a' };
   const ROTA = { r: 16, hp: 3, score: 240, load: 2, speed: 150, color: '#ffd84d' };
   const POLIO = { r: 6, hp: 1, score: 60, load: 1, speed: [80, 110], zig: [0.4, 0.9], vaxAfter: 6 };
@@ -501,7 +502,15 @@ kbd {
     const g = a.createGain(); g.gain.value = vol;
     src.connect(f).connect(g).connect(a.destination); src.start();
   };
-  const sfx = {
+  const SFX_GAP = { shoot: 0.03, pop: 0.05, clink: 0.04, phage: 0.08, die: 0.15 };
+  const sfxLast = {};
+  const throttled = (name, play) => (...args) => {
+    const now = performance.now() / 1000;
+    if (now - (sfxLast[name] || 0) < (SFX_GAP[name] || 0)) return;
+    sfxLast[name] = now;
+    play(...args);
+  };
+  const sfxRaw = {
     shoot: () => tone(880, 0.07, 'triangle', 0.05, -420),
     pop: (size) => noise(0.12 + size * 0.08, 600 + (4 - size) * 700, 0.1 + size * 0.03),
     clink: () => tone(1500, 0.05, 'square', 0.03, 400),
@@ -511,6 +520,7 @@ kbd {
     phage: () => tone(140, 0.25, 'sawtooth', 0.025, 60),
     passage: () => [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.14, 'triangle', 0.05), i * 110)),
   };
+  const sfx = Object.fromEntries(Object.entries(sfxRaw).map(([name, play]) => [name, throttled(name, play)]));
 
   // ---------- state ----------
   const keys = { left: false, right: false, thrust: false, fire: false, jump: false, special: false, bomb: false };
@@ -521,7 +531,7 @@ kbd {
     mode: 'title', score: 0, lives: 3, passage: 1, best: store.get('viral-load.best', 0),
     ship: null, shots: [], virions: [], bits: [], pickups: [], phage: null,
     fireCooldown: 0, jumpCooldown: 0, phageTimer: 0, passageBanner: 0, t: 0,
-    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
+    shield: 0, spray: 0, infected: 0, flocks: [], sputniks: [], amnesia: 0, vaxT: 0, mmrT: 0, rash: [], rashSlow: 0, carriers: [], whirlpools: [], droppings: [], clouds: [], batT: 0, mouseT: 0, confused: 0, weakened: 0, mosquitoT: 0, cruiseT: 0, helpers: [], flagella: 0, superFlagella: 0, bleach: 0, bombs: [], bombCd: 0, bombCharge: 0, bombHeld: false, uv: 0, uvOn: false, uvEnergy: 100, uvOverheat: false, difficulty: store.get('viral-load.difficulty', 'medium'), specialCd: 0, droneT: 0, announced: 1, startAt: store.get('viral-load.start', 1),
   };
 
   const newShip = () => ({ x: view.w / 2, y: view.h / 2, a: -Math.PI / 2, vx: 0, vy: 0, r: 12, safe: 2.5 });
@@ -746,6 +756,7 @@ kbd {
     game.rash = [];
     game.vaxT = polio.length ? POLIO.vaxAfter : 0;
     game.carriers = [];
+    game.whirlpools = [];
     game.droppings = [];
     game.clouds = [];
     game.batT = CARRIERS.bat.first;
@@ -1030,7 +1041,7 @@ kbd {
   // ---------- actions ----------
   // ---------- juice: shake, hit-stop, rings, flashes, pops ----------
   const motion = reduceMotion ? 0.25 : 1;
-  const fx = { bleachSplats: [], beams: [], nets: [], slowmo: 0, chain: 0, chainT: 0, shards: [], trauma: 0, kickX: 0, kickY: 0, recoil: 0, muzzle: 0, hitstop: 0, hurt: 0, rings: [], flashes: [], pops: [], dust: [] };
+  const fx = { killBudget: 3, lastFreeze: -1, chainLabel: null, bleachSplats: [], beams: [], nets: [], slowmo: 0, chain: 0, chainT: 0, shards: [], trauma: 0, kickX: 0, kickY: 0, recoil: 0, muzzle: 0, hitstop: 0, hurt: 0, rings: [], flashes: [], pops: [], dust: [] };
   const shake = (amount) => { fx.trauma = Math.min(1, fx.trauma + amount * motion); };
   const kick = (angle, px) => { fx.kickX += Math.cos(angle) * px * motion; fx.kickY += Math.sin(angle) * px * motion; };
   const freeze = (seconds) => { fx.hitstop = Math.max(fx.hitstop, seconds * motion); };
@@ -1051,19 +1062,23 @@ kbd {
     if (v.kind) return COLORS[KIND_COLOR[v.kind] || v.kind] || COLORS.ink;
     return v.variant ? COLORS.mcherry : v.hue;
   };
+  const KILL_FX = { perFrame: 3, freezeGap: 0.4 };
   const killFx = (v) => {
     const color = colorOf(v);
     const weight = Math.min(1, v.r / 40);
-    shake(0.12 + weight * 0.35);
-    if (v.r >= 24) freeze(0.03 + weight * 0.04);
-    flashAt(v.x, v.y, v.r * 1.4, '#ffffff', 0.09);
-    ring(v.x, v.y, v.r * 2.4, color, 0.4, 3);
-    ring(v.x, v.y, v.r * 1.4, '#ffffff', 0.22, 1.5);
-    pop(v.x, v.y - v.r * 0.6, `+${scoreOf(v)}`, color);
-    shatter(v, color);
     fx.chain = fx.chainT > 0 ? fx.chain + 1 : 1;
     fx.chainT = 0.9;
     if (fx.chain >= 3) chainPop();
+    pop(v.x, v.y - v.r * 0.6, `+${scoreOf(v)}`, color);
+    if (fx.killBudget <= 0) { ring(v.x, v.y, v.r * 1.8, color, 0.3, 2); return; }
+    fx.killBudget -= 1;
+    shake(0.12 + weight * 0.35);
+    const calm = game.uvOn || game.t - fx.lastFreeze < KILL_FX.freezeGap;
+    if (v.r >= 24 && !calm) { freeze(0.03 + weight * 0.04); fx.lastFreeze = game.t; }
+    flashAt(v.x, v.y, v.r * 1.4, '#ffffff', 0.09);
+    ring(v.x, v.y, v.r * 2.4, color, 0.4, 3);
+    ring(v.x, v.y, v.r * 1.4, '#ffffff', 0.22, 1.5);
+    shatter(v, color);
   };
   const shatter = (v, color) => {
     const count = Math.round(5 + v.r / 4);
@@ -1077,7 +1092,11 @@ kbd {
   const chainPop = () => {
     const s = game.ship;
     if (!s) return;
-    fx.pops.push({ x: s.x, y: s.y - 34, text: `CHAIN ×${fx.chain}`, color: fx.chain >= 6 ? COLORS.mcherry : COLORS.amber, life: 0.9, max: 0.9, big: true });
+    const color = fx.chain >= 6 ? COLORS.mcherry : COLORS.amber;
+    const live = fx.chainLabel && fx.pops.includes(fx.chainLabel);
+    if (live) { Object.assign(fx.chainLabel, { x: s.x, y: s.y - 34, text: `CHAIN ×${fx.chain}`, color, life: 0.9 }); return; }
+    fx.chainLabel = { x: s.x, y: s.y - 34, text: `CHAIN ×${fx.chain}`, color, life: 0.9, max: 0.9, big: true };
+    fx.pops.push(fx.chainLabel);
   };
   const slideClear = () => {
     fx.slowmo = 0.9 * motion;
@@ -1093,6 +1112,7 @@ kbd {
   };
   const stepFx = (dt) => {
     fx.trauma = Math.max(0, fx.trauma - dt * 1.7);
+    fx.killBudget = KILL_FX.perFrame;
     fx.slowmo = Math.max(0, fx.slowmo - dt);
     fx.chainT = Math.max(0, fx.chainT - dt);
     fx.shards = fx.shards.filter((d) => {
@@ -1557,6 +1577,13 @@ kbd {
     if (mosquitoPassage(game.passage) && !game.overload && game.mosquitoT <= 0 && !has('mosquito')) { spawnCarrier('mosquito'); game.mosquitoT = rand(...CARRIERS.mosquito.every); }
     if (mousePassage(game.passage) && !game.overload && game.mouseT <= 0 && !has('mouse')) { spawnCarrier('mouse'); game.mouseT = rand(...CARRIERS.mouse.every); }
     game.carriers.forEach((c) => {
+      if (c.sinking > 0) {
+        c.sinking -= dt;
+        c.vx *= Math.exp(-dt * 2);
+        c.x += c.vx * dt;
+        if (c.sinking <= 0) { openWhirlpool(c.x, c.y + 20); c.x = -9999; }
+        return;
+      }
       c.t += dt;
       c.x += c.vx * dt;
       if (c.kind === 'cruise') { c.y = c.base + Math.sin(c.t * 1.4) * 2; }
@@ -1585,12 +1612,56 @@ kbd {
     sfx.clink();
     if (c.hp > 0) return;
     c.fleeing = true;
-    c.vx *= 2.6;
     c.t = 0;
+    if (c.kind === 'cruise') { sinkShip(c); return; }
+    c.vx *= 2.6;
     game.score += CARRIERS[c.kind].score;
     pop(c.x, c.y - 20, c.kind === 'cruise' ? `CRUISE SHIP DOCKS EARLY +${CARRIERS.cruise.score}` : `SHOOED +${CARRIERS[c.kind].score}`, COLORS.amber);
     ring(c.x, c.y, 50, COLORS.amber, 0.4, 2);
     shake(0.2);
+  };
+  const sinkShip = (c) => {
+    c.sinking = WHIRLPOOL.sink;
+    game.score += CARRIERS.cruise.score;
+    pop(c.x, c.y - 24, `SHIP SUNK +${CARRIERS.cruise.score}`, WHIRLPOOL.color);
+    ring(c.x, c.y, 70, WHIRLPOOL.color, 0.6, 3);
+    burst(c.x, c.y, '#e6f0f5', 24, 140);
+    shake(0.5); sfx.die(); rumble(0.8, 500);
+  };
+  const openWhirlpool = (x, y) => {
+    const wx = Math.max(60, Math.min(view.w - 60, x)), wy = Math.max(60, Math.min(view.h - 60, y + 60));
+    game.whirlpools.push({ x: wx, y: wy, life: WHIRLPOOL.life, max: WHIRLPOOL.life, spin: 0 });
+    ring(wx, wy, WHIRLPOOL.radius, WHIRLPOOL.color, 0.8, 5);
+    pop(wx, wy - 30, 'WHIRLPOOL!', WHIRLPOOL.color);
+    shake(0.6);
+  };
+  const pullToward = (o, w, strength, dt) => {
+    const dx = w.x - o.x, dy = w.y - o.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d > WHIRLPOOL.radius) return d;
+    const near = 1 - d / WHIRLPOOL.radius;
+    const fade = Math.min(1, w.life / 1.5);
+    const inward = WHIRLPOOL.pull * near * strength * fade, around = WHIRLPOOL.swirl * near * strength * fade;
+    o.vx += ((dx / d) * inward - (dy / d) * around) * dt;
+    o.vy += ((dy / d) * inward + (dx / d) * around) * dt;
+    return d;
+  };
+  const stepWhirlpools = (dt) => {
+    game.whirlpools.forEach((w) => {
+      w.life -= dt;
+      w.spin += dt * 3;
+      game.virions.filter(solid).forEach((v) => {
+        const d = pullToward(v, w, 1, dt);
+        if (d > WHIRLPOOL.eat) return;
+        v.sinkCd = (v.sinkCd ?? 0) - dt;
+        if (v.sinkCd > 0) return;
+        v.sinkCd = 0.25;
+        damage(v, w.x, w.y, 99);
+      });
+      game.pickups.forEach((p) => pullToward(p, w, 0.6, dt));
+      if (game.ship && game.mode === 'play') pullToward(game.ship, w, WHIRLPOOL.shipPull, dt);
+    });
+    game.whirlpools = game.whirlpools.filter((w) => w.life > 0);
   };
   const encephalitis = (index) => {
     const v = game.virions[index];
@@ -2205,6 +2276,7 @@ kbd {
     if (diff().everything) keepEverythingOn(dt);
     game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
+    stepWhirlpools(dt);
     game.confused = Math.max(0, game.confused - dt);
     game.weakened = Math.max(0, game.weakened - dt);
 
@@ -2879,10 +2951,48 @@ kbd {
     });
   };
   const drawNoro = (v) => blit(sprite(`noro|${v.flash > 0}`, NORO.r + 12, (g) => paintNoro(g, v.flash > 0)), v.x, v.y, v.rot);
+  const drawWhirlpools = () => {
+    if (!game.whirlpools.length) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    game.whirlpools.forEach((w) => {
+      const fade = Math.min(1, w.life / 1.5, (w.max - w.life) / 0.5);
+      ctx.globalAlpha = 0.5 * fade;
+      ctx.fillStyle = 'rgba(2,10,20,0.9)';
+      ctx.beginPath(); ctx.arc(w.x, w.y, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      Array.from({ length: 4 }).forEach((_, arm) => {
+        ctx.strokeStyle = arm % 2 ? '#a8f4ff' : WHIRLPOOL.color;
+        ctx.globalAlpha = (arm % 2 ? 0.35 : 0.55) * fade;
+        ctx.lineWidth = arm % 2 ? 1.5 : 2.5;
+        ctx.beginPath();
+        Array.from({ length: 40 }).forEach((__, i) => {
+          const t = i / 39;
+          const a = w.spin + arm * (Math.PI / 2) + t * 5.2;
+          const r = 14 + t * (WHIRLPOOL.radius - 14);
+          const x = w.x + Math.cos(-a) * r, y = w.y + Math.sin(-a) * r;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        });
+        ctx.stroke();
+      });
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.25 * fade;
+      ctx.strokeStyle = WHIRLPOOL.color; ctx.lineWidth = 1; ctx.setLineDash([4, 8]);
+      ctx.beginPath(); ctx.arc(w.x, w.y, WHIRLPOOL.radius, w.spin * 0.2, w.spin * 0.2 + Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+    ctx.restore();
+  };
   const drawCruise = (c) => {
     const dir = c.vx > 0 ? 1 : -1;
     ctx.save();
     ctx.translate(c.x, c.y);
+    if (c.sinking > 0) {
+      const sunk = 1 - c.sinking / WHIRLPOOL.sink;
+      ctx.translate(0, sunk * 26);
+      ctx.rotate(dir * sunk * 0.7);
+      ctx.globalAlpha = 1 - sunk * 0.85;
+    }
     ctx.scale(dir, 1);
     ctx.globalAlpha = 0.35; ctx.strokeStyle = COLORS.ink; ctx.lineWidth = 1;
     ctx.beginPath(); [0, 1, 2].forEach((i) => { ctx.moveTo(-34 - i * 9, 9 + i * 2); ctx.lineTo(-44 - i * 12, 9 + i * 2); }); ctx.stroke();
@@ -3935,6 +4045,7 @@ kbd {
     game.pickups.forEach(drawPickup);
     game.virions.forEach(drawArriving);
     game.sputniks.forEach(drawSputnik);
+    drawWhirlpools();
     drawCarriers();
     drawClouds();
     if (game.phage) drawPhage(game.phage);
@@ -4312,7 +4423,7 @@ kbd {
       game: 'Buzzes across dropping dengue. 2 hits shoo it.' },
     { section: 'Carriers', name: 'Cruise ship', tag: 'Passage 24', art: carrierArt('cruise', 44),
       real: 'Not a pathogen, but norovirus outbreaks are famous for ending cruises early.',
-      game: 'Sails across spilling norovirus. 5 hits and it docks early.' },
+      game: 'Sails across spilling norovirus. Sink it with 5 hits and it leaves a whirlpool that drags viruses to the bottom, and tugs on you too.' },
 
     { section: 'Allies', name: 'Sputnik', tag: 'With mimivirus', art: { fit: 12, draw: () => drawSputnik({ x: 0, y: 0, rot: game.t }) },
       real: 'A virophage: a virus that infects mimivirus’s virus factories and makes it weaker.',
