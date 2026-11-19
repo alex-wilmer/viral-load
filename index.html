@@ -326,7 +326,7 @@ kbd {
   const VIRUS_CAP = 22;
   const FLAGELLA = { seconds: 15, turn: 5.4, thrust: 420, drag: 0.12, maxSpeed: 400 };
   const BLEACH = { start: 2, max: 3, speed: 330, fuse: 0.55, radius: 150, damage: 3, cooldown: 0.6, color: '#f4ffd6' };
-  const UV = { length: 420, width: 6, tick: 0.13, pickupSeconds: 12, color: '#b98cff' };
+  const UV = { width: 6, tick: 0.13, pickupSeconds: 12, color: '#b98cff' };
   const MITOSIS = { maxCells: 7, everyPassages: 4 };
   const HEP = {
     hepa: { letter: 'A', color: '#ffb86b', r: 8, hp: 1, score: 60, load: 1, speed: [55, 75], shape: 'hex' },
@@ -1506,9 +1506,18 @@ kbd {
   };
 
   const uvArmed = () => game.uv > 0 || hasWeapon('uv');
+  const toScreenEdge = (from, angle) => {
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    const exits = [
+      dx > 0 ? (view.w - from.x) / dx : dx < 0 ? -from.x / dx : Infinity,
+      dy > 0 ? (view.h - from.y) / dy : dy < 0 ? -from.y / dy : Infinity,
+    ];
+    return Math.max(0, Math.min(...exits));
+  };
   const uvBeam = (s) => {
     const from = { x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16 };
-    return { from, to: { x: from.x + Math.cos(s.a) * UV.length, y: from.y + Math.sin(s.a) * UV.length } };
+    const reach = toScreenEdge(from, s.a);
+    return { from, to: { x: from.x + Math.cos(s.a) * reach, y: from.y + Math.sin(s.a) * reach } };
   };
   const uvLaser = (dt) => {
     const s = game.ship;
