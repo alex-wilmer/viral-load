@@ -12,3 +12,21 @@ The whole game is one file, `index.html`: plain canvas and Web Audio, no build s
 ## Deploy
 
 Netlify serves the repo root as-is (`netlify.toml` sets `publish = "."`); there is nothing to build.
+
+## How the code is organised
+
+Everything lives in `index.html`: styles, markup, then one script.
+
+- **Tuning constants** sit near the top of the script, one object per thing (`POX`, `RHABDO`, `BLEACH`, `MEMBRANE`, `DIFFICULTIES`, `WEAPONS`, `BOSSES`…). Change numbers there, not inside functions.
+- **Every enemy is a plain object** in `game.virions` with a `kind`. Makers (`makePox`, `makeHIV`…) build them; `freshRun()` is the single source for per-run state.
+- **Per-kind behaviour is registered once**, in the registry block at the end of the script:
+  - `STEPS[kind]` runs each frame,
+  - `DEATHS[kind]` describes the death burst, sound, pickups and any follow-up (`then`),
+  - `DRAWERS[kind]` draws it.
+
+### Adding a virus
+
+1. Add its constants object and a `make…` function.
+2. Add it to `NEW_WAVE` with the passage it first appears on (and a hint in `passageHint`).
+3. Register its step, death and drawer in the registry block.
+4. Add a Pathodex entry to `DEX`.
