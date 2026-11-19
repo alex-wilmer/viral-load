@@ -126,6 +126,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .picker .chips button:hover { border-color: var(--gfp); }
 .picker .chips button[aria-pressed="true"] { background: var(--gfp); border-color: var(--gfp); color: var(--stage); }
 .picker .chips.wide button { padding: 0 12px; }
+.picker .chips button[data-difficulty="wendy"] { border-color: var(--amber); color: var(--amber); }
+.picker .chips button[data-difficulty="wendy"][aria-pressed="true"] { background: var(--amber); color: var(--stage); }
 .go:disabled { opacity: 0.35; cursor: not-allowed; }
 .picker .hint { font-size: 12px; color: var(--gfp); min-height: 1.4em; }
 .go {
@@ -286,9 +288,11 @@ kbd {
     easy: { label: 'Immunologist', lives: 5, speed: 0.75, fire: 0.14, drop: 0.25, boost: 1.3, blurb: '5 cells, slower viruses, more power-ups' },
     medium: { label: 'Healthy Specimen', lives: 3, speed: 1, fire: 0.17, drop: 0.14, boost: 1, blurb: 'The standard trial' },
     immuno: { label: 'Immunocompromised', lives: 2, speed: 1.15, fire: 0.21, drop: 0.09, boost: 0.6, blurb: '2 cells, slower antibodies, weaker power-ups' },
+    wendy: { label: 'Wendy Mode', lives: 5, speed: 1, fire: 0.14, drop: 0.2, boost: 1.3, everything: true, blurb: 'Every weapon and every power-up, switched on from the start' },
     antivax: { label: 'Antivaxxer', lives: 3, speed: 1.2, fire: 0.17, drop: 0.14, boost: 1, noVaccines: true, outbreak: true, blurb: 'No vaccines at all, and measles from passage 1' },
   };
-  const DIFFICULTY_ORDER = ['easy', 'medium', 'immuno', 'antivax'];
+  const DIFFICULTY_ORDER = ['wendy', 'easy', 'medium', 'immuno', 'antivax'];
+  const WENDY = { bleachEvery: 6 };
   const WEAPONS = [
     { at: 1, key: 'antibody', name: 'Antibodies' },
     { at: 3, key: 'complement', name: 'Complement cascade', how: 'Antibody hits now burst and damage nearby virions' },
@@ -709,7 +713,7 @@ kbd {
 
   const diff = () => DIFFICULTIES[game.difficulty] || DIFFICULTIES.medium;
   const weaponTier = () => WEAPONS.filter((w) => w.at <= game.passage).length;
-  const hasWeapon = (key) => WEAPONS.findIndex((w) => w.key === key) < weaponTier();
+  const hasWeapon = (key) => Boolean(diff().everything) || WEAPONS.findIndex((w) => w.key === key) < weaponTier();
   const begin = (overload, wantVaccine = false) => {
     fit();
     ac();
@@ -1531,6 +1535,19 @@ kbd {
     fx.recoil = Math.max(fx.recoil, 1.5);
     if (Math.random() < 0.5) game.bits.push({ x: from.x, y: from.y, vx: Math.cos(s.a + rand(-0.8, 0.8)) * 120, vy: Math.sin(s.a + rand(-0.8, 0.8)) * 120, life: 0.15, max: 0.15, color: UV.color, size: 1.4 });
   };
+  const keepEverythingOn = (dt) => {
+    if (!game.ship) return;
+    game.shield = Math.max(game.shield, 1);
+    game.spray = Math.max(game.spray, 1);
+    game.mrna = Math.max(game.mrna, 1);
+    game.flagella = Math.max(game.flagella, 1);
+    if (!game.helpers.length) callHelpers();
+    game.helpers.forEach((h) => { h.life = Math.max(h.life, 3); });
+    game.wendyBleachT = (game.wendyBleachT ?? WENDY.bleachEvery) - dt;
+    if (game.wendyBleachT > 0) return;
+    game.wendyBleachT = WENDY.bleachEvery;
+    game.bleach = Math.min(BLEACH.max, game.bleach + 1);
+  };
   const throwBleach = () => {
     const s = game.ship;
     game.bleach -= 1;
@@ -1877,7 +1894,7 @@ kbd {
       s.safe = Math.max(0, s.safe - dt);
       game.uvOn = uvArmed() && held('fire') && game.amnesia <= 0;
       if (game.uvOn) uvLaser(dt);
-      if (!game.uvOn && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
+      if ((!game.uvOn || diff().everything) && held('fire') && game.fireCooldown <= 0 && game.amnesia <= 0) { fire(); game.fireCooldown = diff().fire * (game.helpers.length ? HELPER_T.fireBoost : 1); }
       game.specialCd = Math.max(0, game.specialCd - dt);
       game.bombCd = Math.max(0, game.bombCd - dt);
       if (held('bomb') && game.bombCd <= 0 && game.bleach > 0) throwBleach();
@@ -1892,6 +1909,7 @@ kbd {
     stepHelpers(dt);
     stepBombs(dt);
     game.uv = Math.max(0, game.uv - dt);
+    if (diff().everything) keepEverythingOn(dt);
     game.flagella = Math.max(0, game.flagella - dt);
     stepCarriers(edt);
     game.confused = Math.max(0, game.confused - dt);
@@ -3117,7 +3135,15 @@ kbd {
   };
 
   const drawTimers = () => {
-    const tags = [
+    const wendy = diff().everything && game.mode === 'play';
+    const tags = wendy ? [
+      'WENDY MODE: EVERYTHING ON',
+      `BLEACH ×${game.bleach} · B / L2`,
+      game.specialCd > 0 ? `LANCE ${game.specialCd.toFixed(1)}s` : 'LANCE READY · X / □',
+      game.infected > 0 ? `SALMONELLA INSIDE ${game.infected.toFixed(0)}s` : null,
+      game.amnesia > 0 ? `IMMUNE AMNESIA ${game.amnesia.toFixed(0)}s` : null,
+      game.confused > 0 ? `CONTROLS SWAPPED ${game.confused.toFixed(0)}s` : null,
+    ].filter(Boolean) : [
       game.shield > 0 ? `IFN ${game.shield.toFixed(0)}s` : null,
       game.spray > 0 ? `mAb ${game.spray.toFixed(0)}s` : null,
       game.mrna > 0 ? `mRNA ${game.mrna.toFixed(0)}s` : null,
