@@ -71,14 +71,34 @@ h1 span { color: var(--gfp); }
 #load { color: var(--mcherry); }
 #cells { color: var(--gfp); letter-spacing: 0.15em; }
 .stage {
+  --bg: #03070a;
+  --grid: rgba(217,243,234,0.07);
+  --vig: rgba(3,7,10,0.85);
+  --grid-size: 64px;
   position: relative;
   min-height: 0;
   border: 1px solid var(--rule);
   border-radius: 6px;
-  background: var(--stage);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  background-position: center;
+  transition: background-color 1.4s ease;
   overflow: hidden;
 }
-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(farthest-corner at 50% 50%, transparent 55%, var(--vig) 100%);
+}
+.stage[data-biome="lung"] { --bg: #061420; --grid: rgba(170,222,255,0.11); --vig: rgba(6,18,34,0.85); }
+.stage[data-biome="gut"] { --bg: #150e05; --grid: rgba(255,200,120,0.09); --vig: rgba(24,12,2,0.88); }
+.stage[data-biome="nerve"] { --bg: #0e0718; --grid: rgba(200,160,255,0.10); --vig: rgba(12,4,24,0.88); }
+.stage[data-biome="marrow"] { --bg: #170508; --grid: rgba(255,140,150,0.09); --vig: rgba(24,3,8,0.88); }
+canvas { position: relative; z-index: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .overlay {
   position: absolute;
   inset: 0;
@@ -146,6 +166,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .card .small { font-size: 11px; }
 .go:focus-visible, .pad button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 .scalebar {
+  z-index: 2;
   position: absolute;
   right: 14px;
   bottom: 12px;
@@ -158,6 +179,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .scalebar i { display: block; width: 64px; height: 3px; background: var(--ink); opacity: 0.7; }
 .mag {
+  z-index: 2;
   position: absolute;
   left: 14px;
   bottom: 12px;
@@ -181,7 +203,7 @@ kbd {
   padding: 1px 5px;
 }
 .padstatus { color: var(--gfp); }
-.touch { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.touch { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .touch .stickzone { position: absolute; left: 0; bottom: 0; width: 50%; height: 70%; pointer-events: auto; touch-action: none; }
 .touch .stickbase, .touch .stickknob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
 .touch .stickbase { width: 116px; height: 116px; border: 2px solid rgba(93,255,157,0.35); background: rgba(93,255,157,0.06); }
@@ -232,7 +254,7 @@ kbd {
     </dl>
   </header>
 
-  <div class="stage" id="stage">
+  <div class="stage" id="stage" data-biome="blood">
     <canvas id="field" aria-label="The microscope field. Virions drift and split when your antibodies hit them."></canvas>
     <div class="touch" id="touch" aria-hidden="true">
       <div class="stickzone" id="stickzone"></div>
@@ -246,7 +268,7 @@ kbd {
       <button type="button" class="tb t-storm" data-storm hidden>STORM</button>
       <button type="button" class="tb t-pause" data-pause>❚❚</button>
     </div>
-    <div class="mag">DARK FIELD · 100× OIL · <span id="strain">STRAIN WT</span></div>
+    <div class="mag">DARK FIELD · 100× OIL · <span id="biome">BLOODSTREAM</span> · <span id="strain">STRAIN WT</span></div>
     <div class="scalebar"><i></i>10 µm</div>
     <div class="overlay" id="overlay">
       <div class="card" id="card">
@@ -375,6 +397,14 @@ kbd {
   const HERPES = { r: 24, hp: 3, score: 350, load: 4, active: [4.5, 6.5], latent: 3, shedCap: 16 };
   const POX = { r: 30, hp: 4, envelopeHp: 3, score: 400, load: 6, dashEvery: [4, 7], dashFor: 0.7, dashSpeed: 230 };
   const SIZES = { 3: { r: 44, score: 25, load: 9 }, 2: { r: 25, score: 60, load: 3 }, 1: { r: 13, score: 120, load: 1 } };
+  const BIOMES = [
+    { from: 1, key: 'blood', name: 'BLOODSTREAM' },
+    { from: 6, key: 'lung', name: 'LUNG TISSUE' },
+    { from: 11, key: 'gut', name: 'GUT' },
+    { from: 16, key: 'nerve', name: 'NERVOUS SYSTEM' },
+    { from: 21, key: 'marrow', name: 'BONE MARROW' },
+  ];
+  const biomeFor = (passage) => BIOMES.filter((b) => b.from <= passage).pop();
   const STRAINS = ['WT', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'κ', 'λ', 'μ'];
   const COPIES_PER_UNIT = 12400;
 
@@ -392,6 +422,7 @@ kbd {
     view.dpr = screenDpr * view.zoom;
     view.w = Math.max(280, box.width / view.zoom);
     view.h = Math.max(240, box.height / view.zoom);
+    stageEl.style.setProperty('--grid-size', `${64 * view.zoom}px`);
     canvas.width = Math.round(view.w * view.dpr);
     canvas.height = Math.round(view.h * view.dpr);
     if (typeof seedDust === 'function') seedDust();
@@ -694,7 +725,16 @@ kbd {
     game.passageBanner = 2.2;
     if (game.vaccinated) game.mrna = Math.max(game.mrna || 0, MRNA.passageSeconds);
     $('strain').textContent = `STRAIN ${STRAINS[Math.min(STRAINS.length - 1, game.passage - 1)]}`;
+    enterBiome(biomeFor(game.passage));
     sfx.passage();
+  };
+  const enterBiome = (biome) => {
+    $('biome').textContent = biome.name;
+    if (stageEl.dataset.biome === biome.key) return;
+    const first = !stageEl.dataset.biome;
+    stageEl.dataset.biome = biome.key;
+    if (first || game.mode !== 'play') return;
+    fx.pops.push({ x: view.w / 2, y: view.h / 2 + 40, text: `ENTERING ${biome.name}`, color: COLORS.ink, life: 2.6, max: 2.6, big: true });
   };
 
   const PASSAGES = 23;
@@ -725,7 +765,8 @@ kbd {
       23: 'Rotavirus: the wheel that rolls',
     }[n];
     const crowd = `${Math.min(11, 3 + n)} virions`;
-    return news ? `${news} · ${crowd}` : crowd;
+    const region = biomeFor(n).name.toLowerCase();
+    return [news, crowd, region].filter(Boolean).join(' · ');
   };
   const renderPicker = () => {
     const el = document.querySelector('[data-picker]');
@@ -762,6 +803,7 @@ kbd {
   const pickPassage = (n) => {
     game.startAt = Math.max(1, Math.min(PASSAGES, n));
     store.set('viral-load.start', game.startAt);
+    enterBiome(biomeFor(game.startAt));
     renderPicker();
   };
   const picking = () => (game.mode === 'title' || game.mode === 'over') && !overlay.hidden;
@@ -926,7 +968,8 @@ kbd {
     const changed = id in hudShown;
     hudShown[id] = text;
     $(id).textContent = text;
-    if (changed && id === 'score' && !reduceMotion) $(id).animate([{ transform: 'scale(1.35)', color: '#ffffff' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
+    const now = performance.now();
+    if (changed && id === 'score' && !reduceMotion && now - (hudShown.bumpedAt || 0) > 180 && (hudShown.bumpedAt = now)) $(id).animate([{ transform: 'scale(1.35)', color: '#ffffff' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
   };
   const updateHud = () => {
     showHud('score', game.score.toLocaleString());
@@ -955,7 +998,11 @@ kbd {
   const freeze = (seconds) => { fx.hitstop = Math.max(fx.hitstop, seconds * motion); };
   const ring = (x, y, radius, color, life = 0.35, width = 2.5) => fx.rings.push({ x, y, radius, color, life, max: life, width });
   const flashAt = (x, y, radius, color = '#ffffff', life = 0.1) => fx.flashes.push({ x, y, radius, color, life, max: life });
-  const pop = (x, y, text, color = COLORS.ink) => fx.pops.push({ x, y, text, color, life: 0.8, max: 0.8 });
+  const LIMITS = { pops: 14, shards: 240, shipShots: 140 };
+  const pop = (x, y, text, color = COLORS.ink) => {
+    fx.pops.push({ x, y, text, color, life: 0.8, max: 0.8 });
+    if (fx.pops.length > LIMITS.pops) fx.pops.splice(0, fx.pops.length - LIMITS.pops);
+  };
 
   const KIND_COLOR = { di: 'rhabdo', sirvbit: 'sirv', vap: 'sirv' };
   const NEW_COLORS = { hiv: HIV.color, corona: CORONA.color, dengue: DENGUE.color, rhino: RHINO.color, rota: ROTA.color };
@@ -982,6 +1029,7 @@ kbd {
   };
   const shatter = (v, color) => {
     const count = Math.round(5 + v.r / 4);
+    if (fx.shards.length > LIMITS.shards) return;
     fx.shards.push(...Array.from({ length: count }, () => {
       const a = rand(0, Math.PI * 2);
       const speed = rand(60, 160 + v.r * 3);
@@ -1042,6 +1090,8 @@ kbd {
 
   const fire = () => {
     const s = game.ship;
+    const mine = game.shots.filter((b) => b.from === 'ship');
+    if (mine.length > LIMITS.shipShots) mine.slice(0, mine.length - LIMITS.shipShots).forEach((b) => { b.life = 0; });
     const angles = game.spray > 0 ? [-0.22, 0, 0.22] : [0];
     angles.forEach((da) => {
       const a = s.a + da;
@@ -2018,10 +2068,12 @@ kbd {
     if (game.passage <= game.announced) return;
     const fresh = WEAPONS.filter((w) => w.at > game.announced && w.at <= game.passage);
     game.announced = game.passage;
-    fresh.forEach((w, i) => {
-      fx.pops.push({ x: view.w / 2, y: view.h / 2 + 30 + i * 40, text: `NEW: ${w.name.toUpperCase()}`, color: COLORS.amber, life: 2.6, max: 2.6, big: true });
-      fx.pops.push({ x: view.w / 2, y: view.h / 2 + 48 + i * 40, text: w.how, color: COLORS.ink, life: 2.6, max: 2.6 });
-    });
+    const announce = (text, how, i) => {
+      fx.pops.push({ x: view.w / 2, y: view.h / 2 + 30 + i * 40, text, color: COLORS.amber, life: 2.6, max: 2.6, big: true });
+      if (how) fx.pops.push({ x: view.w / 2, y: view.h / 2 + 48 + i * 40, text: how, color: COLORS.ink, life: 2.6, max: 2.6 });
+    };
+    if (fresh.length > 2) announce(`ARMED: ${fresh.map((w) => w.name.toUpperCase()).join(' · ')}`, null, 0);
+    else fresh.forEach((w, i) => announce(`NEW: ${w.name.toUpperCase()}`, w.how, i));
     if (fresh.length) { ring(view.w / 2, view.h / 2, 300, COLORS.amber, 0.9, 4); sfx.pickup(); }
   };
 
@@ -2213,11 +2265,42 @@ kbd {
     sprites.set(cacheKey, made);
     return made;
   };
+  const SHEEN = { speed: 1.5, alpha: 0.5, second: '#a8f4ff' };
+  const sheen = { phase: null };
+  const scratch = document.createElement('canvas');
+  const scratchCtx = scratch.getContext('2d');
+  const canSheen = typeof scratchCtx.createConicGradient === 'function';
+  const sheened = (s) => {
+    const size = s.c.width;
+    if (scratch.width < size) { scratch.width = size; scratch.height = size; }
+    scratchCtx.globalCompositeOperation = 'source-over';
+    scratchCtx.globalAlpha = 1;
+    scratchCtx.clearRect(0, 0, size, size);
+    scratchCtx.drawImage(s.c, 0, 0);
+    scratchCtx.globalCompositeOperation = 'source-atop';
+    const band = scratchCtx.createConicGradient(game.t * SHEEN.speed + sheen.phase, size / 2, size / 2);
+    band.addColorStop(0, 'rgba(255,255,255,0)');
+    band.addColorStop(0.1, 'rgba(255,255,255,0.95)');
+    band.addColorStop(0.2, 'rgba(255,255,255,0)');
+    band.addColorStop(0.5, 'rgba(168,244,255,0)');
+    band.addColorStop(0.62, SHEEN.second);
+    band.addColorStop(0.74, 'rgba(168,244,255,0)');
+    band.addColorStop(1, 'rgba(255,255,255,0)');
+    scratchCtx.globalAlpha = SHEEN.alpha;
+    scratchCtx.fillStyle = band;
+    scratchCtx.fillRect(0, 0, size, size);
+    return size;
+  };
   const blit = (s, x, y, rot) => {
     ctx.save();
     ctx.translate(x, y);
     if (rot) ctx.rotate(rot);
-    ctx.drawImage(s.c, -s.half, -s.half, s.half * 2, s.half * 2);
+    if (sheen.phase === null || quality.low || !canSheen) {
+      ctx.drawImage(s.c, -s.half, -s.half, s.half * 2, s.half * 2);
+    } else {
+      const size = sheened(s);
+      ctx.drawImage(scratch, 0, 0, size, size, -s.half, -s.half, s.half * 2, s.half * 2);
+    }
     ctx.restore();
   };
 
@@ -2747,9 +2830,11 @@ kbd {
     if (!game.rash.length) return;
     ctx.save();
     ctx.fillStyle = COLORS.rubella;
-    game.rash.forEach((d) => {
-      ctx.globalAlpha = Math.min(0.45, d.life / RUBELLA.rashLife * 0.6);
-      ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2); ctx.fill();
+    Object.values(groupBy(game.rash, (d) => bucket(d.life / RUBELLA.rashLife, 3))).forEach((group) => {
+      ctx.globalAlpha = Math.min(0.45, (bucket(group[0].life / RUBELLA.rashLife, 3) / 3) * 0.6);
+      ctx.beginPath();
+      group.forEach((d) => { ctx.moveTo(d.x + d.size, d.y); ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2); });
+      ctx.fill();
     });
     ctx.restore();
   };
@@ -3348,7 +3433,7 @@ kbd {
     ctx.restore();
   };
 
-  const layers = { key: '', field: null, vignette: null, redEdge: null };
+  const layers = { key: '', redEdge: null };
   const layer = (paint) => {
     const c = document.createElement('canvas');
     c.width = canvas.width; c.height = canvas.height;
@@ -3360,8 +3445,6 @@ kbd {
   const drawLayers = (which, cam = { x: 0, y: 0 }) => {
     const key = `${canvas.width}x${canvas.height}`;
     if (layers.key !== key) {
-      layers.field = layer(paintField);
-      layers.vignette = layer(paintVignette);
       layers.redEdge = layer((g) => {
         const grad = g.createRadialGradient(view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.25, view.w / 2, view.h / 2, Math.hypot(view.w, view.h) / 2);
         grad.addColorStop(0, 'rgba(255,93,122,0)');
@@ -3375,34 +3458,6 @@ kbd {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(layers[which], cam.x * view.dpr, cam.y * view.dpr);
     ctx.restore();
-  };
-
-  const paintField = (ctx) => {
-    const { w, h } = view;
-    ctx.fillStyle = '#03070a';
-    ctx.fillRect(0, 0, w, h);
-    ctx.save();
-    ctx.globalAlpha = 0.08;
-    ctx.strokeStyle = COLORS.ink;
-    ctx.lineWidth = 1;
-    const step = 64;
-    ctx.beginPath();
-    Array.from({ length: Math.ceil(w / step) + 1 }).forEach((_, i) => { ctx.moveTo(i * step + 0.5, 0); ctx.lineTo(i * step + 0.5, h); });
-    Array.from({ length: Math.ceil(h / step) + 1 }).forEach((_, i) => { ctx.moveTo(0, i * step + 0.5); ctx.lineTo(w, i * step + 0.5); });
-    ctx.stroke();
-    ctx.globalAlpha = 0.18;
-    ctx.beginPath(); ctx.moveTo(w / 2, h / 2 - 18); ctx.lineTo(w / 2, h / 2 + 18); ctx.moveTo(w / 2 - 18, h / 2); ctx.lineTo(w / 2 + 18, h / 2); ctx.stroke();
-    ctx.restore();
-  };
-
-  const paintVignette = (ctx) => {
-    const { w, h } = view;
-    const r = Math.hypot(w, h) / 2;
-    const g = ctx.createRadialGradient(w / 2, h / 2, r * 0.55, w / 2, h / 2, r);
-    g.addColorStop(0, 'rgba(3,7,10,0)');
-    g.addColorStop(1, 'rgba(3,7,10,0.85)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
   };
 
   const drawBanner = () => {
@@ -3458,7 +3513,7 @@ kbd {
       game.virions.some((v) => HEP[v.kind]) ? 'hepatitis A to E' : null,
       ...Object.keys(NEW_WAVE).filter((k) => game.virions.some((v) => v.kind === k)).map((k) => NEW_WAVE_NAMES[k]),
     ].filter(Boolean);
-    ctx.fillText(parts.join(' · '), view.w / 2, view.h / 2 - 28);
+    ctx.fillText(parts.length > 4 ? `${parts.slice(0, 4).join(' · ')} · +${parts.length - 4} more` : parts.join(' · '), view.w / 2, view.h / 2 - 28);
     ctx.restore();
   };
 
@@ -3739,7 +3794,7 @@ kbd {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     game.virions.forEach((v) => {
-      if (v.latent) return;
+      if (v.latent || v.r < 10) return;
       const size = v.r * (v.flash > 0 ? 3.6 : 2.6);
       ctx.globalAlpha = v.flash > 0 ? 0.4 : 0.14;
       ctx.drawImage(glowSprite(colorOf(v)).c, v.x - size, v.y - size, size * 2, size * 2);
@@ -3777,13 +3832,15 @@ kbd {
   const easeOutBack = (t) => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
   const drawArriving = (v) => {
     v.seenAt = v.seenAt ?? game.t;
+    sheen.phase = (v.seenAt * 7.3) % (Math.PI * 2);
     const t = Math.min(1, (game.t - v.seenAt) / 0.3);
-    if (t >= 1) { drawVirion(v); return; }
+    if (t >= 1) { drawVirion(v); sheen.phase = null; return; }
     const scale = Math.max(0.05, easeOutBack(t));
     ctx.save();
     ctx.translate(v.x, v.y); ctx.scale(scale, scale); ctx.translate(-v.x, -v.y);
     drawVirion(v);
     ctx.restore();
+    sheen.phase = null;
   };
   const drawHeartbeat = () => {
     if (game.mode !== 'play' || game.lives !== 1) return;
@@ -3804,10 +3861,8 @@ kbd {
   const draw = () => {
     const cam = cameraOffset();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#03070a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(view.dpr, 0, 0, view.dpr, cam.x * view.dpr, cam.y * view.dpr);
-    drawLayers('field', cam);
     drawDust();
     drawRash();
     drawGlows();
@@ -3831,7 +3886,6 @@ kbd {
     drawBursts();
     drawPops();
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    drawLayers('vignette');
     drawHeartbeat();
     drawHurt();
     drawBanner();
@@ -4007,6 +4061,7 @@ kbd {
   $('overloadStart').onclick = startOverload;
   $('vaxStart').onclick = startVaccinated;
   setDifficulty(game.difficulty);
+  enterBiome(biomeFor(game.startAt));
 
   // ---------- title screen: a slide already crawling with virions ----------
   fit();
