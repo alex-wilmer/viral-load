@@ -1102,8 +1102,12 @@ footer.keys > span:not(.padstatus) { display: none; }
   const renderPicker = () => {
     if (ui.view === 'setup' && !overlay.hidden) {
       const scroll = card.scrollTop;
+      const was = document.activeElement;
+      const key = was && card.contains(was) ? ['action', 'step', 'difficulty'].map((k) => was.dataset[k] || '').join('|') + (was.matches('[data-passage-range]') ? '|range' : '') : null;
       card.innerHTML = `<div class="for">Trial setup</div><h2 class="sub">Configure the trial</h2>${setupHtml()}`;
       card.scrollTop = scroll;
+      const again = key && Array.from(card.querySelectorAll('button, [data-passage-range]')).find((el) => ['action', 'step', 'difficulty'].map((k) => el.dataset[k] || '').join('|') + (el.matches('[data-passage-range]') ? '|range' : '') === key);
+      if (again) again.focus({ preventScroll: true });
       return;
     }
     document.querySelectorAll('[data-summary]').forEach((el) => { el.textContent = summaryText(); });
