@@ -25,7 +25,7 @@
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+html, body { height: 100%; margin: 0; }
 body {
   background: var(--ground);
   color: var(--ink);
@@ -305,6 +305,85 @@ kbd {
   footer.keys { display: none; }
 }
 #score { display: inline-block; transform-origin: left center; }
+
+/* ---- full-screen game layout ---- */
+.app { position: relative; display: block; padding: 0; gap: 0; }
+.stage { position: absolute; inset: 0; border: 0; border-radius: 0; }
+header { position: absolute; inset: 0; z-index: 4; display: block; pointer-events: none; transition: opacity 0.35s ease; }
+header h1 { display: none; }
+.hud { position: absolute; inset: 0; margin: 0; }
+.hud > div { position: absolute; display: grid; gap: 2px; align-items: start; text-shadow: 0 0 12px rgba(3,7,10,0.9); }
+.hud dt { font-size: 9px; letter-spacing: 0.22em; }
+.hud dd { font: 700 17px var(--mono); }
+.hud > div:nth-child(2) { top: 14px; left: max(18px, env(safe-area-inset-left)); }
+.hud > div:nth-child(3) { top: 14px; left: 50%; transform: translateX(-50%); text-align: center; justify-items: center; }
+.hud > div:nth-child(1) { top: 14px; right: max(18px, env(safe-area-inset-right)); text-align: right; justify-items: end; }
+.hud > div:nth-child(6) { top: 56px; right: max(18px, env(safe-area-inset-right)); text-align: right; justify-items: end; opacity: 0.75; }
+.hud > div:nth-child(6) dd { font-size: 13px; }
+.hud > div:nth-child(4) { bottom: 62px; left: max(18px, env(safe-area-inset-left)); }
+.hud > div:nth-child(5) { bottom: 16px; left: max(18px, env(safe-area-inset-left)); }
+.hud .membrane .bar { width: 120px; height: 8px; border-radius: 2px; box-shadow: 0 0 10px rgba(93,255,157,0.25); }
+#cells { font-size: 15px; }
+body.in-menu header { opacity: 0; }
+.mag { left: auto; right: 160px; bottom: 14px; opacity: 0.6; }
+footer.keys { position: absolute; top: 80px; right: max(18px, env(safe-area-inset-right)); z-index: 4; pointer-events: none; }
+footer.keys > span:not(.padstatus) { display: none; }
+@media (max-width: 760px) {
+  .hud dt { font-size: 8px; letter-spacing: 0.16em; }
+  .hud dd { font-size: 13px; }
+  .hud > div:nth-child(2) { top: 10px; left: 12px; }
+  .hud > div:nth-child(3) { top: 10px; }
+  .hud > div:nth-child(1) { top: 10px; right: 62px; }
+  .hud > div:nth-child(4) { bottom: auto; top: 52px; left: 12px; }
+  .hud > div:nth-child(5) { bottom: auto; top: 52px; left: 72px; }
+  .hud > div:nth-child(4) dt, .hud > div:nth-child(5) dt { display: none; }
+  .hud .membrane .bar { width: 84px; }
+  .hud > div:nth-child(6) { display: none; }
+  .mag, .scalebar { display: none; }
+}
+
+/* ---- main menu glow-up ---- */
+.card.menu { position: relative; padding: 36px 44px 28px; isolation: isolate; }
+.card.menu .corner { position: absolute; width: 26px; height: 26px; border: 2px solid rgba(93,255,157,0.55); pointer-events: none; }
+.card.menu .corner.tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.card.menu .corner.tr { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.card.menu .corner.bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+.card.menu .corner.br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+.card.menu .reticle { position: absolute; z-index: -1; left: 50%; top: 150px; width: 420px; height: 420px; margin: -210px 0 0 -210px; border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(93,255,157,0.22) 0 1deg, transparent 1deg 6deg);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%, #000 66%, transparent 67%, transparent 78%, #000 79%, #000 80%, transparent 81%);
+  mask: radial-gradient(circle, transparent 62%, #000 63%, #000 66%, transparent 67%, transparent 78%, #000 79%, #000 80%, transparent 81%);
+  animation: reticle-spin 60s linear infinite; opacity: 0.8; }
+@keyframes reticle-spin { to { transform: rotate(360deg); } }
+.card.menu .for { letter-spacing: 0.4em; }
+.card.menu .tagline { font-size: 13px; letter-spacing: 0.02em; }
+.card.menu .summary { border-radius: 0; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); background: rgba(93,255,157,0.05); box-shadow: inset 0 0 0 1px rgba(93,255,157,0.3); border: 0; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; }
+.card.menu .cta { filter: drop-shadow(0 0 18px rgba(93,255,157,0.45)); transition: filter 0.2s; }
+.card.menu .cta:focus-within, .card.menu .cta:hover { filter: drop-shadow(0 0 2px #ffc861) drop-shadow(0 0 22px rgba(93,255,157,0.6)); }
+.card.menu .go.big { position: relative; overflow: hidden; border-radius: 0; box-shadow: none; outline: none; text-transform: uppercase; letter-spacing: 0.22em; font-weight: 800; padding: 18px 64px;
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  background: linear-gradient(180deg, #a6ffd0 0%, #5dff9d 55%, #33d977 100%); }
+.card.menu .go.big::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.7) 50%, transparent 65%); transform: translateX(-120%); animation: cta-shine 3.4s ease-in-out infinite; }
+@keyframes cta-shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+.card.menu .secondary .go { border-radius: 0; text-transform: uppercase; letter-spacing: 0.14em; font-size: 11px; padding: 11px 20px;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  background: rgba(93,255,157,0.06); box-shadow: inset 0 0 0 1px rgba(93,255,157,0.35); color: var(--ink); }
+.card.menu .secondary .go.alt { background: rgba(255,93,122,0.08); box-shadow: inset 0 0 0 1px rgba(255,93,122,0.55); color: var(--mcherry); }
+.card.menu .secondary .go:hover, .card.menu .secondary .go:focus { background: rgba(93,255,157,0.16); outline: none; }
+.card.menu .secondary .go.alt:hover, .card.menu .secondary .go.alt:focus { background: rgba(255,93,122,0.18); }
+.pad-nav .card.menu .secondary .go:focus { box-shadow: inset 0 0 0 2px #ffc861; }
+.pad-nav .card.menu .summary:focus { box-shadow: inset 0 0 0 2px #ffc861; outline: none; }
+.logo .tube { stroke: url(#logoGrad); }
+.logo .tube path:nth-child(1) { animation-delay: 0.05s; } .logo .tube path:nth-child(2) { animation-delay: 0.12s; } .logo .tube path:nth-child(3) { animation-delay: 0.2s; }
+.logo .tube path:nth-child(4) { animation-delay: 0.27s; } .logo .tube path:nth-child(5) { animation-delay: 0.33s; } .logo .tube path:nth-child(6) { animation-delay: 0.45s; }
+.logo .tube path:nth-child(7) { animation-delay: 0.52s; } .logo .tube path:nth-child(8) { animation-delay: 0.6s; } .logo .tube path:nth-child(9) { animation-delay: 0.66s; }
+.logo .tube path { animation: letter-on 0.9s steps(1) both; }
+@keyframes letter-on { 0% { opacity: 0; } 20% { opacity: 1; } 32% { opacity: 0.15; } 48%, 100% { opacity: 1; } }
+.overlay:has(.card.menu)::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 160px; pointer-events: none; z-index: -1;
+  background: linear-gradient(180deg, transparent, rgba(93,255,157,0.05) 50%, transparent); animation: menu-scan 7s linear infinite; }
+@keyframes menu-scan { from { transform: translateY(-160px); } to { transform: translateY(100vh); } }
+@media (prefers-reduced-motion: reduce) { .card.menu .reticle, .card.menu .go.big::after, .overlay::after, .logo .tube path { animation: none; } }
+@media (max-width: 760px) { .card.menu { padding: 26px 18px 20px; } .card.menu .reticle { width: 300px; height: 300px; margin: -150px 0 0 -150px; top: 120px; } .card.menu .go.big { padding: 16px 40px; } }
 </style>
 
 <div class="app">
@@ -928,10 +1007,16 @@ kbd {
     const mid = width / 2;
     const letters = placed.parts.join('');
     return `<svg class="logo" viewBox="0 0 ${width} 205" role="img" aria-label="Viral Load">
-      <defs><filter id="logoGlow" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="9"/></filter></defs>
+      <defs>
+        <filter id="logoGlow" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
+        <linearGradient id="logoGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${width}" y2="0" spreadMethod="reflect">
+          <stop offset="0" stop-color="#5dff9d"/><stop offset="0.45" stop-color="#7af0ff"/><stop offset="0.55" stop-color="#b6ffd8"/><stop offset="1" stop-color="#5dff9d"/>
+          <animateTransform attributeName="gradientTransform" type="translate" from="${-width} 0" to="${width} 0" dur="7s" repeatCount="indefinite"/>
+        </linearGradient>
+      </defs>
       <g fill="none" stroke-linejoin="round" stroke-linecap="square">
         <g class="glow" stroke="#5dff9d" stroke-width="30" filter="url(#logoGlow)">${letters}</g>
-        <g class="tube" stroke="#5dff9d" stroke-width="23">${letters}</g>
+        <g class="tube" stroke="#5dff9d" stroke-width="23" style="stroke: url(#logoGrad)">${letters}</g>
         <g class="core" stroke="#06120d" stroke-width="15">${letters}</g>
         <g class="inner" stroke="#c8ffe4" stroke-width="2.2">${letters}</g>
         <g class="pulse" stroke="#ffffff" stroke-width="4">${letters}</g>
@@ -963,7 +1048,7 @@ kbd {
   const menuHtml = () => `
     <p class="tagline">You are a macrophage. Hold the line against ${PASSAGES} passages of viruses, bacteria and parasite bosses.</p>
     <button type="button" class="summary" data-action="setup"><span data-summary>${summaryText()}</span><span class="edit">Change</span></button>
-    <button class="go big" id="start" type="button" data-action="start">Begin trial</button>
+    <div class="cta"><button class="go big" id="start" type="button" data-action="start">Begin trial</button></div>
     <div class="buttons secondary">
       <button class="go alt" id="overloadStart" type="button" data-action="overload">Viral Overload</button>
       <button class="go dexbtn" type="button" data-open-dex>Pathodex</button>
@@ -1007,7 +1092,8 @@ kbd {
   };
   const showMenu = () => {
     ui.view = 'menu';
-    showCard(`<div class="for">A clinical trial for Wendy</div>${LOGO_SVG}${menuHtml()}${HOW_HTML}`);
+    showCard(`<div class="reticle" aria-hidden="true"></div><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span><div class="for">A clinical trial for Wendy</div>${LOGO_SVG}${menuHtml()}${HOW_HTML}`);
+    card.classList.add('menu');
   };
   const showSetup = () => {
     ui.view = 'setup';
@@ -1174,7 +1260,7 @@ kbd {
     updateHud();
   };
 
-  const showCard = (html) => { card.innerHTML = html; overlay.hidden = false; (card.querySelector('.go.big') || card.querySelector('button'))?.focus({ preventScroll: true }); };
+  const showCard = (html) => { card.className = 'card'; card.innerHTML = html; overlay.hidden = false; (card.querySelector('.go.big') || card.querySelector('button'))?.focus({ preventScroll: true }); };
 
   const overloadOverCard = () => {
     const bestTime = store.get('viral-load.overload-best', 0);
@@ -4599,7 +4685,7 @@ kbd {
     }
     const fill = Math.min(1, viralLoad() / overloadLimit());
     const barW = Math.min(360, w * 0.5);
-    const x = (w - barW) / 2, y = 16;
+    const x = (w - barW) / 2, y = 64;
     const danger = fill > 0.75;
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -4664,7 +4750,7 @@ kbd {
     ctx.font = `600 ${Math.round(11 * textScale)}px "IBM Plex Mono", monospace`;
     ctx.fillStyle = COLORS.amber;
     const lines = view.zoom < 0.9 ? tags : [tags.join('   ')];
-    lines.forEach((line, i) => ctx.fillText(line, 14 * textScale, (22 + i * 15) * textScale));
+    lines.forEach((line, i) => ctx.fillText(line, 18 * textScale, (view.zoom < 0.9 ? 86 / view.zoom : 72) + i * 15 * textScale));
     ctx.restore();
   };
 
@@ -5159,6 +5245,7 @@ kbd {
   const touchLayer = $('touch');
   const refreshTouch = () => {
     touchLayer.classList.toggle('idle', game.mode !== 'play' && game.mode !== 'paused');
+    document.body.classList.toggle('in-menu', game.mode === 'title' || game.mode === 'over');
     touchButtons.storm.hidden = !(game.overload && game.mode === 'play');
     touchButtons.lance.classList.toggle('off', game.mode === 'play' && !hasWeapon('perforin'));
     touchButtons.bomb.classList.toggle('off', game.mode === 'play' && game.bleach <= 0);
